@@ -92,6 +92,7 @@ text-shadow: 0 0 8px rgba(255,255,255,0.3);
 #monster.miss-dmg { animation: miss 0.4s; }
 @keyframes miss { 0%, 100% { transform: translateX(0); } 50% { transform: scale(1.08); filter: brightness(1.3) sepia(0.3); } }
 #monsterName { font-size: 10px; color: #ffff00; letter-spacing: 1px; white-space: nowrap; }
+#monsterName.long { font-size: 9px; letter-spacing: 0; }
 #problem { text-align: center; min-width: 0; }
 #problem .label { color: #ffff00; font-size: 11px; letter-spacing: 1px; margin-bottom: 3px; }
 #problem .expr {
@@ -717,12 +718,12 @@ function figure(q) {
       if (m !== 'mabG') { z.num(P[V], P.G, '2', 'ok', P[zz]); z.num(P.G, M, '1', 'or', P[zz]); }
     } else { z.seg(P.G, M, 'ok', 4.5); z.dot(lerp(P[V], M, 1 / 3), 'ok', 3.5); z.dot(P.G, 'ok', 5); }   // AD を 比の 3つ分に 分ける
   }
-  if (m === 'gMid') {
-    const M = meet(P.A, P.G, P.B, P.C); D.D = M;
+  if (m === 'gMid') {   // 頂点は 毎回 えらぶ（A だけ だと「BC の 中点」が 続く。11-03 先生）
+    const [y, zz] = OTH[X], M = meet(P[X], P.G, P[y], P[zz]); D[MED[X]] = M;
     tri();
-    a_.seg(P.A, P.G, 'cy', 2.2); a_.seg(P.G, M, 'cy', 1.8, true);
-    a_.dot(P.G); a_.lab(P.G, 'G', 'pt'); a_.dot(M, 'w', 3.5); a_.lab(M, 'D');
-    z.seg(P.G, M, 'ok', 2.6); z.tick(P.B, M, 1, 'ok'); z.tick(M, P.C, 1, 'ok');
+    a_.seg(P[X], P.G, 'cy', 2.2); a_.seg(P.G, M, 'cy', 1.8, true);
+    a_.dot(P.G); a_.lab(P.G, 'G', 'pt'); a_.dot(M, 'w', 3.5); a_.lab(M, MED[X]);
+    z.seg(P.G, M, 'ok', 2.6); z.tick(P[y], M, 1, 'ok'); z.tick(M, P[zz], 1, 'ok');
   }
   if (m === 'arSame') {
     if (q.v === 'G') {
@@ -789,7 +790,7 @@ function makeOptions(q, rng) {
   if (m === 'mabIc' && !s2) { fixed = true; add('∠A の 二等分線', []); add('中線', ['icLine']); add('BC の 垂直二等分線', ['icLine']); }
   if ((m === 'mabIc' || m === 'mabAr') && s2) { const [cc, b] = q.sd; add(cc + ' : ' + b, []); add(b + ' : ' + cc, ['swapS']); add(m === 'mabIc' ? '1 : 1' : cc + ' : ' + (cc + b), [m === 'mabIc' ? 'midR' : 'wholeA']); }
   if (m === 'gRatio') { const r = q.ask === 'AG' ? [2, 1] : [1, 2]; add(r[0] + ' : ' + r[1], []); add(r[1] + ' : ' + r[0], ['gSwap']); add('1 : 1', ['gHalf']); }
-  if (m === 'gMid') { fixed = true; add('BC の 中点', []); add('BD : DC ＝ AB : AC と なる 点', ['gBis']); add('A から BC に 下ろした 垂線の 足', ['gAlt']); }
+  if (m === 'gMid') { const [y, zz] = OTH[X], sd = y + zz, M = MED[X]; fixed = true; add(sd + ' の 中点', []); add(y + M + ' : ' + M + zz + ' ＝ ' + X + y + ' : ' + X + zz + ' と なる 点', ['gBis']); add(X + ' から ' + sd + ' に 下ろした 垂線の 足', ['gAlt']); }
   if (m === 'gFrac') { const ag = q.ask === 'AG'; add(ag ? '{2|3}' : '{1|3}', []); add(ag ? '{1|3}' : '{2|3}', ['gPart']); add('{1|2}', ['gRatioF']); }
   if (m === 'mabG') {
     const L = q.L;
@@ -847,7 +848,7 @@ function texts(q) {
       return [['▼ ' + r + ' は？', 'G は △ABC の 重心、' + X + Dn + ' は 中線。' + r + ' ＝ ？'], ['点 G は △ABC の 重心、' + X + Dn + ' は 中線で ある。' + r + ' を 求めよ。']]; },
     gFrac: () => { const s = q.ask === 'AG' ? X + 'G' : 'G' + Dn;
       return [['▼ 何分の何？', 'G は 重心、' + X + Dn + ' は 中線。' + s + ' は ' + X + Dn + ' の 何分の何？'], ['点 G は △ABC の 重心、' + X + Dn + ' は 中線で ある。' + s + ' は ' + X + Dn + ' の 何倍か。']]; },
-    gMid: () => [['▼ D は どんな 点？', 'G は △ABC の 重心。AG を 延ばして BC と 交わる 点 D は？'], ['点 G は △ABC の 重心で ある。直線 AG と 辺 BC の 交点を D と する。点 D は どのような 点か。']],
+    gMid: () => { const sd = OTH[X].join(''); return [['▼ ' + Dn + ' は どんな 点？', 'G は △ABC の 重心。' + X + 'G を 延ばして ' + sd + ' と 交わる 点 ' + Dn + ' は？'], ['点 G は △ABC の 重心で ある。直線 ' + X + 'G と 辺 ' + sd + ' の 交点を ' + Dn + ' と する。点 ' + Dn + ' は どのような 点か。']]; },
     mabG: () => (s2 ? [['▼ ② ' + q.ask + ' は？', 'AD ＝ ' + q.L + '。G は △ABC の 重心。' + q.ask + ' の 長さは？'], ['△ABC の 重心を G、中線 AD ＝ ' + q.L + ' と する。' + q.ask + ' の 長さを 求めよ。']]
       : [['▼ ① 比の 1つ分は？', 'AD ＝ ' + q.L + '。G は △ABC の 重心。比の 1つ分の 長さは？'], ['△ABC の 重心を G、中線 AD ＝ ' + q.L + ' と する。AG : GD の 比の 1 あたりの 長さを 求めよ。']]),
     arSame: () => {
@@ -890,7 +891,7 @@ function reasonLines(q) {
       : ['内心は 角の 二等分線の 交点 → AI は ∠A の 二等分線', 'AI を 延ばした AD も ∠A の 二等分線'];
     case 'gRatio': return ['重心は 中線を 頂点の ほうから 2 : 1 に 内分する', q.ask === 'AG' ? X + 'G : G' + Dn + ' ＝ 2 : 1' : 'G' + Dn + ' : ' + X + 'G ＝ 1 : 2'];
     case 'gFrac': return [X + 'G : G' + Dn + ' ＝ 2 : 1 → ' + X + Dn + ' は 比の 3つ分', q.ask === 'AG' ? X + 'G は 比の 2つ分 → ' + X + Dn + ' の {2|3}' : 'G' + Dn + ' は 比の 1つ分 → ' + X + Dn + ' の {1|3}'];
-    case 'gMid': return ['重心は 中線の 交点 → AD は 中線', 'D は BC の 中点（BC を 1 : 1 に 内分）'];
+    case 'gMid': { const sd = OTH[X].join(''); return ['重心は 中線の 交点 → ' + X + Dn + ' は 中線', Dn + ' は ' + sd + ' の 中点（' + sd + ' を 1 : 1 に 内分）']; }
     case 'mabG': return s2 ? [q.ask === 'AG' ? 'AG は 比の 2つ分 → ' + fracStr(q.L, 3) + ' × 2 ＝ ' + fracStr(2 * q.L, 3) : 'GD は 比の 1つ分 → ' + fracStr(q.L, 3)]
       : ['AG : GD ＝ 2 : 1 → AD は 比の 3つ分', '1つ分 ＝ ' + q.L + ' × {1|3} ＝ ' + fracStr(q.L, 3)];
     case 'arSame': return { D: ['頂点 A が 同じ・底辺 BD、DC が 一直線上 → 高さが 等しい', '底辺 BD と DC は ちがう'], M: ['頂点 A が 同じ・底辺が 一直線上 → 高さが 等しい', 'AD は 中線 → BD ＝ DC → 底辺も 等しい'],
@@ -939,7 +940,7 @@ const MONSTERS = [
   ['icAngle', 'ハサミウチ', '✂️', '内心は 角の 二等分線 → 角度を 隣へ よみかえる'],
   ['icPlace', 'ウチガワ', '🏠', '内心は どんな 三角形でも 内側'],
   ['gRatio', 'ナカワリ', '⚖️', '重心は 中線を 頂点の ほうから 2 : 1 に 内分'],
-  ['gMid', 'チュウテン', '📍', 'AG を 延ばすと BC の 中点（1 : 1 に 内分）'],
+  ['gMid', 'チュウテン', '📍', '頂点から G を 通って 延ばすと 向かいの 辺の 中点（1 : 1 に 内分）'],
   ['gFrac', 'サンブン', '🍰', 'AG は AD の {2|3}、GD は AD の {1|3}'],
   ['arSame', 'タカサミ', '🗻', '頂点が 同じで 底辺が 一直線上 → 高さが 等しい'],
   ['arHeight', 'ソコヘンヒ', '🧱', '高さが 等しい とき 面積比は 底辺比で よみかえる'],
@@ -979,7 +980,7 @@ const GEN = {
   mabIc: rng => ({ sd: pick(rng, SD) }),
   gRatio: rng => ({ an: pick(rng, ACUTE), x: [pick(rng, NAMES)], ask: pick(rng, ['AG', 'GD']) }),
   gFrac: rng => ({ an: pick(rng, ACUTE), x: [pick(rng, NAMES)], ask: pick(rng, ['AG', 'GD']) }),
-  gMid: rng => ({ an: pick(rng, ACUTE) }),
+  gMid: rng => ({ an: pick(rng, ACUTE), x: [pick(rng, NAMES)] }),
   mabG: rng => ({ an: pick(rng, ACUTE), L: pick(rng, rng() < 0.5 ? L_DIV : L_NON), ask: pick(rng, ['AG', 'GD']) }),
   arSame: rng => { const v = pick(rng, ['D', 'D', 'M', 'G']); return Object.assign({ v, an: pick(rng, ACUTE) }, v === 'D' ? { t: pick(rng, T_LIST) } : {}); },
   arHeight: rng => ({ v: pick(rng, ['pair', 'pair', 'whole']), an: pick(rng, ACUTE), bd: pick(rng, BD_PAIRS) }),
@@ -1067,16 +1068,18 @@ function makeSlots(ch, rng, opt = {}) {
   const play = opt.play === undefined ? ri(rng, 0, PLAYS - 1) : Math.min(opt.play, PLAYS - 1);
   return C.plays[play].map(f => (f === 'MAB' ? { lv: C.lv, form: C.mab.form, mab: true, play } : { lv: C.lv, form: f, play })).concat(mid.map(s => Object.assign(s, { play })));
 }
-function newContext() { return { recent: [], recentTri: [], recentNum: [], weak: {}, log: [] }; }
+function newContext() { return { recent: [], recentTri: [], recentNum: [], lastAns: {}, weak: {}, log: [] }; }
+const ptKey = prm => (['whichPt', 'whichProp', 'mabLine'].includes(prm.mode) ? PT_OF[prm.v] : prm.mode === 'gMid' ? prm.x[0] : null);   // 答えの 点（外心・内心・重心）、中点の 辺（頂点）
+const ptGrp = prm => (prm.mode === 'gMid' ? 'g' : 'pt');
 const shapeKey = prm => (prm.sd ? 'sd' + prm.sd.join(',') : 'an' + prm.an.join(','));
 const numKey = prm => (prm.sd ? 'n' + prm.sd[0] + ':' + prm.sd[1] : prm.L ? 'L' + prm.L : prm.bd ? 'bd' + prm.bd.join(':') : null);
 function makeProblem(slot, ctx, rng) {
   const w = ctx.weak[slot.lv];
   const forms = slot.form ? [slot.form] : CHAPTERS[slot.lv - 1].forms;
-  const fresh = prm => !ctx.recent.includes(JSON.stringify(prm)) && !ctx.recentTri.includes(shapeKey(prm)) && !(numKey(prm) && ctx.recentNum.includes(numKey(prm)));   // 同じ 形・同じ 数の 三角形は 続けない
+  const fresh = (prm, again) => !ctx.recent.includes(JSON.stringify(prm)) && !ctx.recentTri.includes(shapeKey(prm)) && !(numKey(prm) && ctx.recentNum.includes(numKey(prm))) && (again || !(ptKey(prm) && ptKey(prm) === ctx.lastAns[ptGrp(prm)]));   // 同じ 形・同じ 数の 三角形は 続けない。どの 点？の 答えも 同じ 点を 続けない（11-03 先生。まちがえた あとの 出しなおしは 同じ 点で よい）
   const gen = () => genPrm(pick(rng, forms), rng);
   let prm = null, target = false;
-  if (w) for (let i = 0; i < 400 && !prm; i++) { const c = gen(); if (likeOK(c, w.like) && fresh(c)) { prm = c; target = true; } }
+  if (w) for (let i = 0; i < 400 && !prm; i++) { const c = gen(); if (likeOK(c, w.like) && fresh(c, true)) { prm = c; target = true; } }
   for (let i = 0; i < 400 && !prm; i++) { const c = gen(); if (fresh(c)) prm = c; }
   if (!prm) prm = gen();
   const p = build(prm, rng, { boss: !!slot.boss });
@@ -1086,6 +1089,7 @@ function makeProblem(slot, ctx, rng) {
   ctx.recent.push(p.key); if (ctx.recent.length > 8) ctx.recent.shift();
   ctx.recentTri = ctx.recentTri.concat([shapeKey(prm)]).slice(-2);
   ctx.recentNum = ctx.recentNum.concat(numKey(prm) ? [numKey(prm)] : []).slice(-2);
+  if (ptKey(prm)) ctx.lastAns[ptGrp(prm)] = ptKey(prm);
   return p;
 }
 function record(ctx, p, ok, cls, ms) {
@@ -1192,7 +1196,7 @@ function renderEnemy() {
   const c = chap(), boss = atBoss() && !state.tut, e = state.tut ? { name: 'まと', sprite: '🎯' } : enemyNow();
   monsterEl.textContent = e.sprite;
   monsterEl.className = boss ? 'boss' : p() && p().mab && !state.tut ? 'mab' : '';
-  $('monsterName').textContent = e.name;
+  $('monsterName').textContent = e.name; $('monsterName').classList.toggle('long', [...e.name].length >= 6);   // 6文字 いじょうの 名前は 小さく（問題文に かからない）
   gameEl.classList.toggle('boss-mid', boss && !c.final);
   gameEl.classList.toggle('boss-final', boss && !!c.final);
 }
@@ -1325,8 +1329,9 @@ function drawSpec(ctx, W, H, d, spec, showAns, small) {
       const v = X(it.v), a = X(it.a), b = X(it.b), a1 = Math.atan2(a[1] - v[1], a[0] - v[0]), a2 = Math.atan2(b[1] - v[1], b[0] - v[0]);
       let dd = a2 - a1; while (dd > Math.PI) dd -= 2 * Math.PI; while (dd <= -Math.PI) dd += 2 * Math.PI;
       const r = it.r * d * fs;
+      if (it.s === '?') { ctx.fillStyle = 'rgba(255,159,67,0.45)'; ctx.beginPath(); ctx.moveTo(v[0], v[1]); ctx.arc(v[0], v[1], r, a1, a1 + dd, dd < 0); ctx.closePath(); ctx.fill(); }   // 問題の 角は 色で ぬる（「？」の 文字は 答えさせる ほうの イメージ なので 書かない。11-03 先生）
       ctx.strokeStyle = col; ctx.lineWidth = 1.6 * d; ctx.beginPath(); ctx.arc(v[0], v[1], r, a1, a1 + dd, dd < 0); ctx.stroke();
-      if (it.s) { const am = a1 + dd / 2, rr = Math.min(64 * d * fs, Math.max(r + 9 * d * fs, 7.5 * d * fs / Math.max(0.05, Math.sin(Math.abs(dd) / 2))));   /* 角が 小さい ときは 印を 外へ（となりの 印と 重ならない） */ textAt(ctx, d, it.s, v[0] + Math.cos(am) * rr, v[1] + Math.sin(am) * rr, col, (it.s === '?' ? 13 : 11) * fs); }
+      if (it.s && it.s !== '?') { const am = a1 + dd / 2, rr = Math.min(64 * d * fs, Math.max(r + 9 * d * fs, 7.5 * d * fs / Math.max(0.05, Math.sin(Math.abs(dd) / 2))));   /* 角が 小さい ときは 印を 外へ（となりの 印と 重ならない） */ textAt(ctx, d, it.s, v[0] + Math.cos(am) * rr, v[1] + Math.sin(am) * rr, col, (it.s === '?' ? 13 : 11) * fs); }
     }
     if (kind === 'dot') { const q = X(it.p); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(q[0], q[1], it.r * d * fs, 0, Math.PI * 2); ctx.fill(); }
     if (kind === 'num') {
