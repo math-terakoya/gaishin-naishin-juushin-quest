@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<!-- © 2026 math-terakoya ／ CC BY-NC-SA 4.0（表示・非営利・継承）https://creativecommons.org/licenses/by-nc-sa/4.0/deed.ja -->
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:;">
+<title>外心・内心・重心クエスト</title>
+<style>
+  /* ===================== レトロRPG風CSS（三角比クエストと共通） ===================== */
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  html, body {
+    height: 100%;
+    background: #000;
+    font-family: 'Courier New', 'ＭＳ ゴシック', 'Osaka-Mono', monospace;
+    color: #fff;
+    overflow: hidden;
+  }
+  body { display: flex; align-items: center; justify-content: center; font-feature-settings: "palt"; }
+  #game {
+    width: 100%;
+    max-width: 480px;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 900px;
+    background: #000;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    border: 2px solid #333;
+    overflow: hidden;
+  }
+
+.rpg-window {
+background: #000;
+border: 3px solid #fff;
+box-shadow: 0 0 0 3px #000, 0 0 0 5px #fff;
+padding: 8px;
+margin: 6px 8px;
+position: relative;
+}
+
+#status {
+display: grid;
+grid-template-columns: 1fr 1fr;
+column-gap: 14px;
+padding: 4px 10px;
+font-size: 12px;
+line-height: 1.7;
+flex-shrink: 0;
+}
+#status .row { display: flex; justify-content: space-between; }
+#status .label { color: #ffff00; letter-spacing: 1px; }
+#status .value { color: #fff; letter-spacing: 1px; }
+#status .wide { grid-column: 1 / -1; }
+
+.hearts { letter-spacing: 2px; color: #ff4444; }
+.hearts .empty { color: #444; }
+
+#battle {
+display: grid;
+grid-template-columns: 64px 1fr;
+align-items: center;
+gap: 6px;
+padding: 6px 8px;
+flex-shrink: 0;
+}
+#enemy { text-align: center; }
+#monster {
+font-size: 38px;
+line-height: 1.1;
+display: inline-block;
+transition: transform 0.15s, opacity 0.3s;
+text-shadow: 0 0 8px rgba(255,255,255,0.3);
+}
+#monster.boss { animation: bossFloat 2s ease-in-out infinite; text-shadow: 0 0 12px rgba(255,220,0,0.8); }
+@keyframes bossFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+#monster.hit { animation: hit 0.3s; }
+@keyframes hit {
+0%, 100% { transform: translateX(0); filter: brightness(1); }
+20% { transform: translateX(-8px); filter: brightness(3) hue-rotate(180deg); }
+40% { transform: translateX(8px); filter: brightness(3) hue-rotate(180deg); }
+60% { transform: translateX(-5px); filter: brightness(3); }
+80% { transform: translateX(5px); }
+}
+#monster.dying { animation: die 0.8s forwards; }
+@keyframes die {
+0% { opacity: 1; transform: scale(1); }
+50% { opacity: 0.7; transform: scale(1.1); filter: brightness(3); }
+100% { opacity: 0; transform: scale(0.3) rotate(180deg); }
+}
+#monster.miss-dmg { animation: miss 0.4s; }
+@keyframes miss { 0%, 100% { transform: translateX(0); } 50% { transform: scale(1.08); filter: brightness(1.3) sepia(0.3); } }
+#monsterName { font-size: 10px; color: #ffff00; letter-spacing: 1px; white-space: nowrap; }
+#problem { text-align: center; min-width: 0; }
+#problem .label { color: #ffff00; font-size: 11px; letter-spacing: 1px; margin-bottom: 3px; }
+#problem .expr {
+color: #fff;
+font-size: 18px;
+font-family: 'Times New Roman', 'Hiragino Mincho ProN', serif;
+letter-spacing: 0.5px;
+line-height: 1.35;
+}
+#skipTut {
+position: absolute; top: 4px; right: 6px;
+background: #000; color: #aaa; border: 1px solid #666;
+font-family: inherit; font-size: 10px; padding: 2px 6px; cursor: pointer;
+}
+#skipTut.hidden { display: none; }
+#problemExpr .nw { display: inline-block; white-space: nowrap; }
+/* ゲーム中に 章えらびへ もどる ボタン（れんしゅう中と ダメージの あいだは かくす） */
+#mapBtn { position: absolute; top: 5px; right: 8px; background: #000; color: #aaa; border: 1px solid #666; font-family: inherit; font-size: 10px; padding: 2px 6px; cursor: pointer; z-index: 3; }
+#mapBtn.hidden { display: none; }
+#livesDisplay { margin-right: 58px; }   /* 右上の「≡ しょう」と かさならないよう ハートを 左へ */
+@media (max-width: 360px) { #mapBtn .mbt { display: none; } #livesDisplay { margin-right: 26px; } }   /* せまい 画面は「≡」だけ */
+#problem .expr.long { font-size: 15px; }
+#problem .expr.exam { font-size: 14px; text-align: left; line-height: 1.6; word-break: keep-all; }   /* ことばの 途中で 改行しない（空白で 切る） */
+#ruleBtn { display: block; margin: 3px auto 0; white-space: nowrap; background: #000; color: #aaa; border: 1px solid #666; font-family: inherit; font-size: 10px; padding: 2px 6px; cursor: pointer; z-index: 2; }
+
+#planeWrap { flex: 1 1 0; min-height: 0; position: relative; overflow: hidden; }
+#plane {
+position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+border: 2px solid #fff; touch-action: manipulation; cursor: pointer;
+}
+
+#message {
+min-height: 48px;
+max-height: 30vh;
+max-height: 30dvh;
+overflow-y: auto;
+font-size: 12px;
+line-height: 1.55;
+letter-spacing: 0;
+white-space: pre-wrap;
+flex-shrink: 0;
+padding: 6px 10px;
+}
+
+/* — ボタン（2列。出す・隠すは問題の種類で切りかえ） — */
+#controls { padding: 2px 8px 8px; flex-shrink: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.key {
+background: #000; border: 2px solid #fff; color: #fff;
+font-family: inherit; font-size: 15px; font-weight: bold;
+padding: 6px 4px; cursor: pointer; text-align: center; line-height: 1.25;
+min-height: 44px; touch-action: manipulation;
+}
+.key.hidden { display: none; }
+.key:active { transform: translateY(1px); }
+.key.on { background: #fff; color: #000; }
+.key.full { grid-column: 1 / -1; }
+.key.submit { background: #004488; color: #ffff00; }
+.key.submit:disabled { background: #222; color: #666; border-color: #666; cursor: default; }
+.key.opt { font-family: 'Times New Roman', 'Hiragino Mincho ProN', serif; font-weight: normal; font-size: 16px; }
+.key.right { background: #005522; color: #fff; border-color: #44ff88; }
+.key.wrong { background: #551111; color: #fff; border-color: #ff4444; }
+.key .eq { display: block; font-size: 10px; font-weight: normal; letter-spacing: 1px; opacity: 0.85; }
+#mineBtn, #ansBtn { font-size: 13px; min-height: 38px; word-break: keep-all; }
+.key.pulse { animation: pulse 0.9s ease-in-out infinite; }
+@keyframes pulse { 50% { background: #ffff00; color: #000; border-color: #ffff00; box-shadow: 0 0 0 3px #ffff00; } }
+
+/* — TeX 風の分数と根号（外から読み込まずに描く） — */
+.fr { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; font-size: 0.78em; line-height: 1.08; margin: 0 2px; }
+.fr > .nu { border-bottom: 1.5px solid currentColor; padding: 0 3px 1px; }
+.fr > .de { padding: 1px 3px 0; }
+.rt { white-space: nowrap; }
+.bar { display: inline-block; width: 1.9em; height: 6px; border-radius: 2px; vertical-align: middle; margin: 3px 1px; }
+.bar.o { background: #ff9f43; }
+.bar.b { background: #4f8dff; }
+#defPoints .defr { font-family: 'Times New Roman', 'Hiragino Mincho ProN', serif; font-size: 16px; margin-top: 4px; }
+#defPoints .fr { font-size: 0.82em; }
+.rad { border-top: 1.5px solid currentColor; padding: 0 1px; margin-left: -1px; }
+/* — チュートリアルの指 — */
+/* 輪の中心が left/top（点の位置）に来て、指と文字はその下 */
+#tapHint { position: absolute; z-index: 5; pointer-events: none; transform: translate(-50%, 0); padding-top: 20px; text-align: center; }
+#tapHint.hidden, #btnHint.hidden { display: none; }
+#tapHint .ring {
+position: absolute; left: 50%; top: 0; width: 46px; height: 46px; margin: -23px 0 0 -23px;
+border: 3px solid #ffff00; border-radius: 50%; animation: ring 1s ease-out infinite;
+}
+@keyframes ring { 0% { transform: scale(0.4); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
+#tapHint .finger { display: block; font-size: 34px; animation: tap 0.8s ease-in-out infinite; }
+@keyframes tap { 50% { transform: translateY(6px); } }
+#tapHint .txt {
+display: inline-block; margin-top: 2px; padding: 1px 6px; background: #000; border: 2px solid #ffff00;
+color: #ffff00; font-size: 12px; font-weight: bold; white-space: nowrap;
+}
+#btnHint {
+position: absolute; z-index: 60; pointer-events: none; font-size: 30px;
+transform: translate(-50%, -100%); animation: tapDown 0.8s ease-in-out infinite;
+}
+@keyframes tapDown { 50% { margin-top: 6px; } }
+
+/* — オーバーレイ — */
+.overlay {
+position: absolute; inset: 0; background: #000;
+display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+padding: 24px; z-index: 100; text-align: center;
+overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+/* 入りきる ときは まんなか、入りきらない ときは 上から スクロール（章が ふえても 下の ボタンまで とどく）。上下の 見えない すきまで まんなかに よせる */
+.overlay::before, .overlay::after { content: ''; flex: 1 0 0; }
+.overlay.hidden { display: none; }
+.overlay h1 { font-size: 28px; color: #ffff00; letter-spacing: 3px; margin-bottom: 20px; text-shadow: 3px 3px 0 #884400; line-height: 1.4; }
+.overlay p { font-size: 14px; color: #fff; line-height: 2; margin-bottom: 16px; letter-spacing: 1px; }
+.overlay .sub { color: #aaa; font-size: 12px; }
+.overlay .start-btn {
+background: #000; border: 3px solid #fff; box-shadow: 0 0 0 3px #000, 0 0 0 5px #fff;
+color: #ffff00; padding: 14px 28px; font-size: 16px; letter-spacing: 3px; cursor: pointer; margin-top: 20px; font-family: inherit;
+}
+.overlay .start-btn:active { background: #fff; color: #000; }
+.overlay .how-btn {
+background: #000; border: 2px solid #888; color: #ccc;
+padding: 8px 18px; font-size: 13px; letter-spacing: 2px; cursor: pointer; margin-top: 18px; font-family: inherit;
+}
+.overlay .hero { font-size: 64px; margin-bottom: 12px; }
+#chapterList { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 360px; }
+.chap { background: #000; border: 2px solid #fff; color: #fff; font-family: inherit; font-size: 14px; padding: 8px 10px; text-align: left; cursor: pointer; }
+.chap .unit { display: block; font-size: 11px; color: #aaa; margin-top: 2px; }
+.chap.locked { color: #666; border-color: #444; cursor: default; }
+.chap.reset { border-color: #888; color: #ccc; margin-top: 8px; }
+.how-btn.hidden { display: none; }
+.overlay .points {
+text-align: left; border: 3px solid #fff; box-shadow: 0 0 0 3px #000, 0 0 0 5px #fff;
+padding: 12px 14px; margin: 4px 0 8px; font-size: 13px; line-height: 2; letter-spacing: 0.5px;
+}
+.overlay .points b { color: #ffff00; }
+
+.dmg-float { position: absolute; font-size: 24px; font-weight: bold; pointer-events: none; animation: dmgFloat 1s forwards; z-index: 10; }
+@keyframes dmgFloat {
+0% { opacity: 1; transform: translateY(0) scale(0.6); }
+30% { transform: translateY(-16px) scale(1.2); }
+100% { opacity: 0; transform: translateY(-44px) scale(1); }
+}
+#flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 50; }
+#flash.on { animation: flash 0.2s; }
+@keyframes flash { 0% { opacity: 0; } 50% { opacity: 0.6; } 100% { opacity: 0; } }
+.level-up {
+position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+font-size: 32px; color: #ffff00; text-shadow: 3px 3px 0 #884400, 0 0 16px #ffff00;
+letter-spacing: 4px; z-index: 20; animation: lvUp 1.8s forwards; pointer-events: none; white-space: nowrap;
+}
+@keyframes lvUp {
+0% { opacity: 0; transform: translate(-50%, -30%) scale(0.5); }
+20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+100% { opacity: 0; transform: translate(-50%, -80%) scale(1); }
+}
+@media (max-height: 640px) {
+#status { line-height: 1.5; }
+#monster { font-size: 32px; }
+.key { min-height: 40px; font-size: 14px; }
+}
+#controls .nw { display: inline-block; white-space: nowrap; }
+/* — ボス戦 — */
+#game.boss-mid .rpg-window { border-color: #ff5a5a; box-shadow: 0 0 0 3px #000, 0 0 0 5px #ff5a5a; }
+#game.boss-final .rpg-window { border-color: #ffcc33; box-shadow: 0 0 0 3px #000, 0 0 0 5px #ffcc33; }
+#game.boss-mid #plane { border-color: #ff5a5a; }
+#game.boss-final #plane { border-color: #ffcc33; }
+.boss-warn {
+position: absolute; left: 0; right: 0; top: 38%; z-index: 40; pointer-events: none; text-align: center;
+font-size: 34px; font-weight: bold; letter-spacing: 4px; color: #fff; background: rgba(180,0,0,0.85);
+padding: 14px 0; text-shadow: 3px 3px 0 #400; animation: warn 2s forwards;
+}
+.boss-warn.final { background: rgba(170,120,0,0.9); text-shadow: 3px 3px 0 #430; }
+@keyframes warn { 0%, 20%, 40%, 60% { opacity: 1; } 10%, 30%, 50% { opacity: 0.35; } 85% { opacity: 1; } 100% { opacity: 0; } }
+.level-up.crit { color: #ff9900; font-size: 26px; text-shadow: 3px 3px 0 #662200, 0 0 18px #ff6600; }
+.chap .stars { float: right; color: #ffd84a; letter-spacing: 1px; }
+.chap .stars .dim { color: #444; }
+#progressDisplay { letter-spacing: 0; }
+#controls.three { grid-template-columns: 1fr 1fr 1fr; }
+#controls.three .key.opt { font-size: 20px; font-family: inherit; font-weight: bold; }
+.zukan-btn { background: #000; border: 2px solid #7fe8ff; color: #7fe8ff; font-family: inherit; font-size: 13px; padding: 6px 10px; margin-bottom: 10px; cursor: pointer; width: 100%; max-width: 360px; }
+.comp { color: #ffd84a; font-size: 15px; letter-spacing: 1px; margin-bottom: 8px; text-shadow: 0 0 10px rgba(255,216,74,0.6); }
+.comp.hidden { display: none; }
+#zukanList { width: 100%; max-width: 380px; text-align: left; font-size: 12px; line-height: 1.5; }
+#zukanList .zch { color: #ffff00; margin: 8px 0 2px; font-size: 12px; }
+#zukanList .zi { border: 1px solid #555; padding: 3px 6px; margin-bottom: 3px; display: grid; grid-template-columns: 18px 26px 1fr; align-items: center; }
+#zukanList .zi .mk { font-size: 14px; }
+#zukanList .zi .sp { font-size: 18px; text-align: center; }
+#zukanList .zi .tip { grid-column: 2 / -1; color: #aaa; font-size: 11px; }
+#zukanList .zi.lock { color: #555; }
+#zukanList .zi.got .mk { color: #ffd84a; }
+#zukanList .zi.master .mk { color: #44ff88; }
+#zukanList .zi.mabz { border: 2px solid #ffd84a; box-shadow: 0 0 6px rgba(255,216,74,0.7), inset 0 0 6px rgba(255,120,220,0.35); }
+#zukanList .zi.mabz.lock { color: #a08a3a; }
+#monster.mab { animation: bossFloat 1.6s ease-in-out infinite, mabHue 2.4s linear infinite; text-shadow: 0 0 12px #ff7ad9, 0 0 18px #7fe8ff; }
+@keyframes mabHue { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+.boss-warn.mab { background: linear-gradient(90deg, rgba(255,90,180,0.85), rgba(255,216,74,0.9), rgba(90,200,255,0.85)); text-shadow: 3px 3px 0 #403; }
+/* せまい 画面：問題集の ことばを 少し 小さく、メッセージ欄を 少し 低く（図を のこす） */
+@media (max-width: 360px) { #problem .expr.exam { font-size: 13px; line-height: 1.45; } }
+@media (max-height: 640px) { #message { max-height: 22vh; max-height: 22dvh; } #problem .expr.exam { line-height: 1.4; } }
+
+/* — 選択肢が 長い とき（実際の 幅を 測って 文字を 小さく → 1列）。列は 中身に 押し広げられない — */
+#controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#controls.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#controls.one { grid-template-columns: minmax(0, 1fr); }
+.key { min-width: 0; max-width: 100%; overflow: hidden; }
+#game, #status, #message, #battle, #problem, #controls { min-width: 0; max-width: 100%; }
+#game { max-width: 480px; }   /* パソコンでも スマホの 幅で まんなかに（すぐ 上の 行で 100% に 広がらない ように。2026-10-27）*/
+#problem .expr.exam { display: inline-block; max-width: 100%; }   /* 問題集の ことばは かたまりごと まんなかに（行の 頭は そろえる） */
+#status .row { min-width: 0; gap: 4px; }
+#status .row .value { min-width: 0; word-break: keep-all; overflow-wrap: break-word; text-align: right; }   /* ことばの 途中で 折らない（空白で 折る） */
+#message { overflow-wrap: anywhere; }
+#problemExpr { overflow-wrap: break-word; }
+#status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#status .label { white-space: nowrap; }
+#status .row:not(.wide) .value { white-space: nowrap; }
+@media (max-width: 300px) { #status { column-gap: 6px; padding: 4px 6px; } }
+/* 文字が 大きい 設定で 縦に 入りきらない ときは 画面を 縦に スクロール（図は 100px より 小さく しない） */
+#game { overflow-y: auto; overflow-x: hidden; }
+#planeWrap { min-height: 100px; }
+#message { flex-shrink: 1; min-height: 48px; }   /* 縦が 足りない ときは まず メッセージを 小さく（中で スクロール）して ボタンを 画面に のこす */
+/* ことばの 途中で 改行しない（空白の ところで 折る。長すぎる ときだけ どこでも）*/
+#message, .overlay .points, .overlay p, #zukanList .tip { word-break: keep-all; overflow-wrap: anywhere; }
+/* 正解の 大きい まる（ほめる ことばつき）：2026-10-30 「正解かどうかが わかりにくい」→ 正解は 大きく ほめる */
+.maru { position: absolute; left: 50%; top: 46%; width: min(64vw, 290px); aspect-ratio: 1; transform: translate(-50%, -50%); z-index: 45; pointer-events: none;
+  border: 16px solid #ff4646; border-radius: 50%; box-shadow: 0 0 26px rgba(255,70,70,0.75), inset 0 0 26px rgba(255,70,70,0.5);
+  display: flex; align-items: center; justify-content: center; animation: maru 1.15s ease-out forwards; background: radial-gradient(circle, rgba(0,0,0,0.72) 55%, rgba(0,0,0,0.35) 100%); }
+.maru span { color: #fff; font-size: 30px; font-weight: bold; white-space: nowrap; letter-spacing: 2px; text-shadow: 3px 3px 0 #a00000, 0 0 14px #ff5050; }
+.maru.gold { border-color: #ffd84a; box-shadow: 0 0 30px rgba(255,216,74,0.85), inset 0 0 26px rgba(255,216,74,0.55); }
+.maru.gold span { text-shadow: 3px 3px 0 #8a5a00, 0 0 14px #ffd84a; }
+@keyframes maru { 0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0; } 22% { transform: translate(-50%, -50%) scale(1.12); opacity: 1; }
+  36% { transform: translate(-50%, -50%) scale(1); } 78% { opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1.04); opacity: 0; } }
+/* — 約束の 画面の 小さい 図（外心・内心・重心）— */
+#defFigs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; width: 100%; max-width: 380px; margin: 0 auto 6px; flex-shrink: 0; }
+#defFigs .df { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+#defFigs canvas { width: 100%; height: auto; border: 1px solid #555; background: #000a18; }
+#defFigs .dn { font-size: 13px; color: #ffff00; margin-top: 3px; }
+#defPoints { max-width: 380px; }
+#plane { cursor: default; }
+#controls.one .key { min-height: 38px; padding: 4px; }
+@media (max-height: 640px) { #controls.one .key { min-height: 32px; padding: 2px 4px; } #controls.one .key.opt { font-size: 15px; } }   /* 選択肢が 1列の ときは 低く（図を のこす） */
+</style>
+</head>
+<body>
+<div id="game">
+
+  <div class="overlay" id="titleScreen">
+    <div class="hero">🔺</div>
+    <h1>外心・内心・<br>重心クエスト</h1>
+    <p class="sub">～数学A 図形の性質～</p>
+    <p class="comp hidden" id="compTitle"></p>
+    <p style="margin-top:20px;">3本の 線が 1点で 交わる。<br>図の 印から 何が 等しいかを みきわめろ！</p>
+    <button class="start-btn" id="startBtn">▶ はじめる</button>
+    <button class="how-btn" id="howBtn">？ あそびかた</button>
+    <p class="sub" style="margin-top:20px;font-size:10px;">どの 章からでも、何回でも。<br>ぜんぶの 章を ★3 に すると さいごの 章</p>
+    <p class="sub" style="margin-top:14px;font-size:9px;opacity:0.7;">© 2026 math-terakoya　CC BY-NC-SA 4.0</p>
+  </div>
+
+  <div class="overlay hidden" id="tutDoneScreen">
+    <div class="hero">🎯</div>
+    <h1>れんしゅう<br>クリア！</h1>
+    <div class="points">
+      <div>・<b>外心</b> → 辺の 中点（／）で 直角 ＝ 垂直二等分線の 交点</div>
+      <div>・<b>内心</b> → 角を 2つに 分ける ＝ 角の 二等分線の 交点</div>
+      <div>・<b>重心</b> → 中線の 交点。中線を 2 : 1 に 内分</div>
+    </div>
+    <button class="start-btn" id="goBtn">▶ しょうえらびへ</button>
+  </div>
+
+  <div class="overlay hidden" id="defScreen">
+    <h1 style="font-size:20px;margin-bottom:8px;">外心・内心・重心の 約束</h1>
+    <div id="defFigs">
+      <div class="df"><canvas id="defO" width="120" height="100"></canvas><span class="dn">外心 O</span></div>
+      <div class="df"><canvas id="defI" width="120" height="100"></canvas><span class="dn">内心 I</span></div>
+      <div class="df"><canvas id="defG" width="120" height="100"></canvas><span class="dn">重心 G</span></div>
+    </div>
+    <p class="sub" style="margin-bottom:4px;">3本の 線が 1点で 交わる → 特徴が 現れる → 解く ヒント</p>
+    <div class="points" id="defPoints">
+      <div>・<b>外心 O</b>：3辺の 垂直二等分線の 交点。OA ＝ OB ＝ OC（外接円の 中心）→ 二等辺三角形が 現れる → 「二等辺三角形の 底角は 等しい」で 角度を よみかえる</div>
+      <div>・<b>内心 I</b>：3つの 角の 二等分線の 交点。3辺から 等しい 距離（内接円の 中心）→ 角度を 隣へ よみかえる。二等分線を 延ばすと 比の よみかえ（定理1）</div>
+      <div>・<b>重心 G</b>：3本の 中線の 交点。中線は 頂点と 向かいの 辺の 中点を 結ぶ 線。中線を 2 : 1 に 内分 → 比の よみかえ、面積の 比に つなげる</div>
+    </div>
+    <button class="start-btn" id="defClose">▶ たたかう</button>
+  </div>
+
+  <div class="overlay hidden" id="ruleScreen">
+    <div class="hero">📏</div>
+    <h1 style="font-size:20px;">この ゲームの 約束</h1>
+    <div class="points">
+      <div>・<b>／</b> の 印：本数が 同じ 線分は 同じ 長さ</div>
+      <div>・<b>○ × △</b> の 印：同じ 印の 角は 同じ 大きさ</div>
+      <div>・<b>直角の 印</b>：90°。<b>点線</b>は 補助の 線</div>
+      <div>・はじめに かいて ある 印は 問題の 条件だけ。答えの あと <b style="color:#4dff88">みどり</b>で 印を 足す</div>
+      <div>・計算は しない。図の 印から 何が 等しいかを みきわめる</div>
+    </div>
+    <button class="how-btn" id="ruleDef">📐 外心・内心・重心の 約束</button>
+    <button class="start-btn" id="ruleClose">▶ もどる</button>
+  </div>
+
+  <div class="overlay hidden" id="mapScreen">
+    <h1 style="font-size:20px;margin-bottom:6px;">しょうを えらべ</h1>
+    <p class="sub" id="mapLV" style="margin-bottom:8px;">ゆうしゃ LV 1</p>
+    <p class="comp hidden" id="mapComp"></p>
+    <button class="zukan-btn" id="zukanBtn">📖 モンスターずかん</button>
+    <div id="chapterList"></div>
+  </div>
+
+  <div class="overlay hidden" id="zukanScreen">
+    <h1 style="font-size:20px;margin-bottom:4px;">📖 モンスターずかん</h1>
+    <p class="comp hidden" id="zukanComp"></p>
+    <p class="sub" id="zukanCount" style="margin-bottom:4px;"></p>
+    <p class="sub" style="margin-bottom:4px;font-size:11px;line-height:1.6;">○ たおした　◎ にがてを こくふく した<br>（ボスの ◎ は ノーミスで たおした）</p>
+    <div id="zukanList"></div>
+    <button class="start-btn" id="zukanClose">▶ もどる</button>
+  </div>
+
+  <div class="overlay hidden" id="clearScreen">
+    <div class="hero" id="clearHero">🏰</div>
+    <h1 id="clearTitle">たおした！</h1>
+    <p id="clearText" style="white-space:pre-line;"></p>
+    <button class="start-btn" id="clearBtn">▶ しょうえらびへ</button>
+    <button class="how-btn" id="againBtn">🔁 もう一回</button>
+    <button class="how-btn hidden" id="resetBtn1">🔄 さいしょから あそぶ</button>
+  </div>
+
+  <div class="overlay hidden" id="resetScreen">
+    <div class="hero">🔄</div>
+    <h1 style="font-size:20px;">さいしょから あそぶ？</h1>
+    <p>★・LV・モンスターずかんの きろくが きえて、LV 1 から に なります。</p>
+    <button class="start-btn" id="resetYes">さいしょから</button>
+    <button class="how-btn" id="resetNo">やめる</button>
+  </div>
+
+  <div class="overlay hidden" id="quitScreen">
+    <div class="hero">🗺️</div>
+    <h1 style="font-size:20px;">しょうえらびに もどる？</h1>
+    <p>この 章は さいしょから やりなおしに なります。</p>
+    <button class="start-btn" id="quitYes">もどる</button>
+    <button class="how-btn" id="quitNo">つづける</button>
+  </div>
+
+  <div class="overlay hidden" id="gameOverScreen">
+    <div class="hero">💀</div>
+    <h1 style="color:#ff4444;text-shadow:3px 3px 0 #440000;">ぜんめつ…</h1>
+    <p>ゆうしゃは たおれてしまった…</p>
+    <p class="sub">この 章の さいしょから</p>
+    <button class="start-btn" id="retryBtn">▶ やりなおす</button>
+    <button class="how-btn" id="toMapBtn">しょうえらびへ</button>
+  </div>
+
+  <div class="rpg-window" id="status">
+    <button id="mapBtn" class="hidden">≡<span class="mbt"> しょう</span></button>
+    <div class="row"><span class="label">ゆうしゃ</span><span class="value" id="levelDisplay">LV 1</span></div>
+    <div class="row"><span class="label">ライフ</span><span class="value hearts" id="livesDisplay">♥♥♥</span></div>
+    <div class="row"><span class="label">こうげき</span><span class="value" id="attackDisplay">2</span></div>
+    <div class="row"><span class="label">てき</span><span class="value" id="enemyHpDisplay">HP 1</span></div>
+    <div class="row wide"><span class="label">しょう</span><span class="value" id="progressDisplay">&nbsp;</span></div>
+  </div>
+
+  <div class="rpg-window" id="message"><span id="msgText">&nbsp;</span></div>
+
+  <div class="rpg-window" id="battle">
+    <button id="skipTut" class="hidden">とばす ▶▶</button>
+    <div id="enemy"><div id="monster">👀</div><div id="monsterName">センミワケ</div><button id="ruleBtn">？ やくそく</button></div>
+    <div id="problem">
+      <div class="label" id="problemLabel">&nbsp;</div>
+      <div class="expr" id="problemExpr">&nbsp;</div>
+    </div>
+  </div>
+
+  <div id="planeWrap"><canvas id="plane" width="300" height="190"></canvas></div>
+
+  <div id="controls">
+    <button class="key opt hidden" data-i="0"></button>
+    <button class="key opt hidden" data-i="1"></button>
+    <button class="key opt hidden" data-i="2"></button>
+    <button class="key submit full" id="decideBtn">けってい</button>
+    <button class="key full hidden" id="nextBtn">▼ つぎへ</button>
+  </div>
+
+  <div id="btnHint" class="hidden">👇</div>
+  <div id="flash"></div>
+</div>
+
+<!-- ========== しくみ（問題づくり・正解の 判定・図の 中身・図鑑）。画面には 触らない ========== -->
+<script id="core">
+(function (G) {
+'use strict';
+// 図：高さ ＝ 幅 × ASPECT（画面と テストで おなじ 値を 使う）。たても 横も 同じ 縮尺で 描く
+const FIG = { ASPECT: 0.66 };
+
+function gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) { [a, b] = [b, a % b]; } return a; }
+function mulberry32(seed) {
+  let t = seed >>> 0;
+  return function () {
+    t = (t + 0x6D2B79F5) >>> 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function ri(rng, lo, hi) { return lo + Math.floor(rng() * (hi - lo + 1)); }
+function pick(rng, a) { return a[Math.floor(rng() * a.length)]; }
+function shuffle(rng, arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+const fracStr = (a, b) => { const g = gcd(a, b) || 1, x = a / g, y = b / g; return y === 1 ? String(x) : '{' + x + '|' + y + '}'; };
+
+// ---------- 三角形の 形（角は 5° きざみ。同じ 形が 続かない ように 決まった 中から えらぶ）----------
+const DEG = Math.PI / 180;
+const NAMES = ['A', 'B', 'C'];
+const OTH = { A: ['B', 'C'], B: ['C', 'A'], C: ['A', 'B'] };   // 向かいの 辺の 両方の 頂点
+const third = (x, y) => NAMES.find(n => n !== x && n !== y);
+const TK = { A: 1, B: 2, C: 3 };            // 向かいの 辺の 中点に つける ／ の 本数
+const SYM = { A: '○', B: '×', C: '△' };     // 角の 二等分の 印
+const MED = { A: 'D', B: 'E', C: 'F' };     // 中線の 足（向かいの 辺の 中点）
+const ACUTE = [];   // 鋭角三角形：どの 角も 40°〜80°、どの 2つの 角も 10° 以上 ちがう（二等辺に 近い 形は 答えが かぶる）
+for (let b = 40; b <= 80; b += 5) for (let c = 40; c <= 80; c += 5) {
+  const a = 180 - b - c;
+  if (a < 40 || a > 80) continue;
+  if (Math.min(Math.abs(a - b), Math.abs(b - c), Math.abs(c - a)) < 10) continue;
+  ACUTE.push([a, b, c]);
+}
+const NEAR = ACUTE.filter(([a, b, c]) => Math.abs(b - c) <= 15);   // 中線が 角の 二等分線っぽく 見える 形（ミワケヌシ）
+const FAR = ACUTE.filter(([a, b, c]) => Math.abs(b - c) >= 25);    // BC の 垂直二等分線が A から はなれる 形（A を 通る ように 見えない）
+const RIGHT = [], OBT = [];
+for (const r of [0, 1, 2]) for (const x of [30, 35, 55, 60]) { const an = [0, 0, 0], o = [0, 1, 2].filter(i => i !== r); an[r] = 90; an[o[0]] = x; an[o[1]] = 90 - x; RIGHT.push(an); }
+for (const r of [0, 1, 2]) for (const ob of [100, 105, 110, 115]) for (let x = 25; x <= 180 - ob - 25; x += 5) {
+  const y = 180 - ob - x, an = [0, 0, 0], o = [0, 1, 2].filter(i => i !== r);
+  if (Math.abs(x - y) < 10) continue;
+  an[r] = ob; an[o[0]] = x; an[o[1]] = y; OBT.push(an);
+}
+// 2辺 AB ＝ c、AC ＝ b と ∠A で 決める 三角形（二等分線の 比・面積の 比）：鋭角で、どの 角も 25° 以上
+const SD_PAIRS = [[6, 4], [4, 6], [6, 3], [3, 6], [5, 3], [3, 5], [8, 6], [6, 8], [7, 4], [4, 7], [8, 5], [5, 8]];
+function sdAngles(c, b, A) {
+  const a = Math.sqrt(b * b + c * c - 2 * b * c * Math.cos(A * DEG)), B = Math.acos((a * a + c * c - b * b) / (2 * a * c)) / DEG;
+  return [A, B, 180 - A - B];
+}
+const SD = [];
+for (const [c, b] of SD_PAIRS) for (const A of [50, 55, 60, 65, 70, 75, 80]) { const an = sdAngles(c, b, A); if (Math.min(...an) >= 25 && Math.max(...an) <= 85) SD.push([c, b, A]); }
+const T_LIST = [0.3, 0.35, 0.4, 0.6, 0.65, 0.7];   // D が 中点から はなれた 所（BD ≠ DC が 見て わかる）
+const BD_PAIRS = [];
+for (let p = 2; p <= 6; p++) for (let r = 2; r <= 6; r++) if (p !== r && p + r <= 9) BD_PAIRS.push([p, r]);   // D が B・C に 近すぎない
+const L_DIV = [6, 9, 12], L_NON = [4, 5, 7, 8, 10];   // 重心の 長さ：3 で 割れる 数と 割れない 数
+
+// ---------- 座標（B(0, 0)、C(1, 0)、A は 上。y は 上が ＋）----------
+const add = (a, b) => [a[0] + b[0], a[1] + b[1]], sub = (a, b) => [a[0] - b[0], a[1] - b[1]], mul = (a, k) => [a[0] * k, a[1] * k];
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]), mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+const unit = v => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
+const dot2 = (a, b) => a[0] * b[0] + a[1] * b[1];
+function triPts(q) {
+  if (q.sd) {
+    const [c, b, A] = q.sd, a = Math.sqrt(b * b + c * c - 2 * b * c * Math.cos(A * DEG)), ax = (a * a + c * c - b * b) / (2 * a);
+    return { A: [ax / a, Math.sqrt(c * c - ax * ax) / a], B: [0, 0], C: [1, 0] };
+  }
+  const cB = 1 / Math.tan(q.an[1] * DEG), cC = 1 / Math.tan(q.an[2] * DEG), h = 1 / (cB + cC);
+  return { A: [cB * h, h], B: [0, 0], C: [1, 0] };
+}
+function circum(A, B, C) {   // 外心
+  const d = 2 * (A[0] * (B[1] - C[1]) + B[0] * (C[1] - A[1]) + C[0] * (A[1] - B[1]));
+  const a2 = A[0] * A[0] + A[1] * A[1], b2 = B[0] * B[0] + B[1] * B[1], c2 = C[0] * C[0] + C[1] * C[1];
+  return [(a2 * (B[1] - C[1]) + b2 * (C[1] - A[1]) + c2 * (A[1] - B[1])) / d, (a2 * (C[0] - B[0]) + b2 * (A[0] - C[0]) + c2 * (B[0] - A[0])) / d];
+}
+function incen(A, B, C) {   // 内心（向かいの 辺の 長さで 重みを つけた 平均）
+  const a = dist(B, C), b = dist(C, A), c = dist(A, B), s = a + b + c;
+  return [(a * A[0] + b * B[0] + c * C[0]) / s, (a * A[1] + b * B[1] + c * C[1]) / s];
+}
+const cent = (A, B, C) => [(A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3];   // 重心
+function foot(Q, A, B) { const d = sub(B, A), t = dot2(sub(Q, A), d) / dot2(d, d); return lerp(A, B, t); }   // Q から 直線 AB への 垂線の 足
+function meet(P1, P2, Q1, Q2) {   // 直線 P1P2 と 直線 Q1Q2 の 交点
+  const r = sub(P2, P1), s = sub(Q2, Q1), den = r[0] * s[1] - r[1] * s[0], t = ((Q1[0] - P1[0]) * s[1] - (Q1[1] - P1[1]) * s[0]) / den;
+  return add(P1, mul(r, t));
+}
+function points(q) {
+  const T = triPts(q), P = { A: T.A, B: T.B, C: T.C };
+  P.O = circum(P.A, P.B, P.C); P.I = incen(P.A, P.B, P.C); P.G = cent(P.A, P.B, P.C);
+  return P;
+}
+const R_OF = q => NAMES[q.an.indexOf(Math.max(...q.an))];   // 直角・鈍角の 頂点
+
+// ---------- 図の 中身（画面は これを そのまま 描く。ask ＝ 答える 前、ans ＝ 答えの あとに 足す もの）----------
+// 色の 名前：w 白・cy 水色（問題の 線）・sub 点線・mk オレンジの 印・pt 点・ok みどり（答え）・or／bl 比の 色・sh1／sh2／shg ぬり
+function figure(q) {
+  const P = points(q), m = q.mode, s2 = q.st2 === 2, ask = [], ans = [];
+  const mk = L => ({
+    seg: (a, b, c = 'w', w = 2.2, d = false) => L.push({ k: 'seg', a, b, c, w, d }),
+    dot: (p, c = 'pt', r = 5) => L.push({ k: 'dot', p, c, r }),
+    lab: (p, s, c = 'w') => L.push({ k: 'lab', p, s, c }),
+    tick: (a, b, n, c = 'mk') => L.push({ k: 'tick', a, b, n, c }),
+    right: (v, a, b, c = 'mk') => L.push({ k: 'right', v, a, b, c }),
+    ang: (v, a, b, s, c = 'mk', r = 22, hide = false) => L.push({ k: 'ang', v, a, b, s, c, r, hide }),
+    circ: (o, r, c = 'ok', d = true) => L.push({ k: 'circ', o, r, c, d }),
+    poly: (ps, c) => L.push({ k: 'poly', ps, c }),
+    num: (a, b, s, c = 'cy', away = null) => L.push({ k: 'num', a, b, s, c, away }),
+  });
+  const a_ = mk(ask), z = mk(ans);
+  const tri = () => { a_.seg(P.A, P.B); a_.seg(P.B, P.C); a_.seg(P.C, P.A); };
+  const opp = n => [P[OTH[n][0]], P[OTH[n][1]]];
+  const sideMid = n => mid(...opp(n));
+  const bisFoot = n => meet(P[n], P.I, ...opp(n));
+  const inR = dist(P.I, foot(P.I, P.B, P.C)), outR = dist(P.O, P.A);
+  const D = {};   // 名前つきの 点（テストで 確かめる）
+  // 3本の 線：perp 垂直二等分線・bis 角の 二等分線・med 中線（印つき）
+  const perpLine = (L, n, toO, c = 'cy', marks = true) => {
+    const [y, zz] = OTH[n], M = sideMid(n), e = unit(sub(P[zz], P[y])), u0 = [-e[1], e[0]], u = dot2(sub(P[n], M), u0) > 0 ? u0 : mul(u0, -1);
+    let t1;
+    if (toO) t1 = Math.max(0, dot2(sub(P.O, M), u)) + 0.09;
+    else { const hits = [[P[n], P[y]], [P[n], P[zz]]].map(([p1, p2]) => { const X = meet(M, add(M, u), p1, p2), f = dot2(sub(X, p1), sub(p2, p1)) / dot2(sub(p2, p1), sub(p2, p1)); return f >= -1e-9 && f <= 1 + 1e-9 ? dot2(sub(X, M), u) : Infinity; }); t1 = Math.min(...hits) + 0.07; }
+    L.seg(add(M, mul(u, -0.07)), add(M, mul(u, t1)), c, 1.8);
+    if (marks) { L.right(M, P[zz], add(M, u)); L.tick(P[y], M, TK[n]); L.tick(M, P[zz], TK[n]); }
+    return M;
+  };
+  const bisLine = (L, n, c = 'cy', marks = true) => {
+    const [y, zz] = OTH[n], F = bisFoot(n);
+    L.seg(P[n], F, c, 1.8);
+    if (marks) { L.ang(P[n], P[y], F, SYM[n]); L.ang(P[n], F, P[zz], SYM[n]); }
+    return F;
+  };
+  const medLine = (L, n, c = 'cy', marks = true, w = 1.8) => {
+    const [y, zz] = OTH[n], M = sideMid(n);
+    L.seg(P[n], M, c, w);
+    if (marks) { L.tick(P[y], M, TK[n]); L.tick(M, P[zz], TK[n]); }
+    return M;
+  };
+  const three = (L, v, c, marks) => NAMES.forEach(n => (v === 'perp' ? perpLine(L, n, true, c, marks) : v === 'bis' ? bisLine(L, n, c, marks) : medLine(L, n, c, marks)));
+  const PT = { perp: 'O', bis: 'I', med: 'G' };
+  const threeAns = v => { three(z, v, 'ok', false); z.dot(P[PT[v]], 'ok', 5.5); if (v === 'perp') z.circ(P.O, outR); if (v === 'bis') z.circ(P.I, inR); };
+  const altitude = (L, X, Y, Zn, c = 'ok') => { const H = foot(X, Y, Zn); L.seg(X, H, c, 1.8, true); L.right(H, dist(H, Y) > dist(H, Zn) ? Y : Zn, X, c); return H; };
+  const [X, Y] = q.x || ['A', 'B'], Z = third(X, Y);
+
+  if (m === 'whichPt') {
+    tri(); three(a_, q.v, 'cy', true); a_.dot(P[PT[q.v]]); a_.lab(P[PT[q.v]], 'P', 'pt'); D.P = P[PT[q.v]];
+    threeAns(q.v);
+  }
+  if (m === 'whichProp') {
+    const pt = { vtx: 'O', circ: 'O', side: 'I', inc: 'I', g21: 'G' }[q.v], Q = P[pt]; D.P = Q;
+    tri();
+    if (q.v === 'vtx') NAMES.forEach(n => { a_.seg(Q, P[n], 'cy', 1.6, true); a_.tick(Q, P[n], 1); });
+    if (q.v === 'side') NAMES.forEach(n => { const F = foot(Q, ...opp(n)); a_.seg(Q, F, 'cy', 1.6, true); a_.right(F, opp(n)[1], Q); a_.tick(Q, F, 1); });
+    if (q.v === 'circ') a_.circ(Q, outR, 'cy', true);
+    if (q.v === 'inc') a_.circ(Q, inR, 'cy', true);
+    if (q.v === 'g21') { const M = medLine(a_, 'A', 'cy', true, 2); D.D = M; a_.num(P.A, Q, '2', 'cy', P.B); a_.num(Q, M, '1', 'cy', P.B); a_.lab(M, 'D'); }
+    a_.dot(Q); a_.lab(Q, 'P', 'pt');
+    if (q.v === 'vtx' || q.v === 'circ') z.circ(Q, outR);
+    if (q.v === 'side' || q.v === 'inc') z.circ(Q, inR);
+    if (q.v === 'g21') { medLine(z, 'B', 'ok', false); medLine(z, 'C', 'ok', false); }
+    z.dot(Q, 'ok', 5.5);
+  }
+  if (m === 'mabLine') {
+    tri();
+    if (!s2) {
+      const M = sideMid('A'); D.D = q.v === 'bis' ? bisFoot('A') : M;
+      if (q.v === 'med') { medLine(a_, 'A', 'cy', true, 2.2); medLine(z, 'A', 'ok', false, 2.6); }
+      if (q.v === 'bis') { bisLine(a_, 'A'); bisLine(z, 'A', 'ok', false); }
+      if (q.v === 'perp') { perpLine(a_, 'A', false); perpLine(z, 'A', false, 'ok', false); }
+      a_.dot(D.D, 'w', 3.5); a_.lab(D.D, 'D');
+    } else {
+      three(a_, q.v, 'cy', true); a_.dot(P[PT[q.v]]); a_.lab(P[PT[q.v]], 'P', 'pt'); D.P = P[PT[q.v]];
+      threeAns(q.v);
+    }
+  }
+  if (m === 'ocEq' || m === 'icEq') {
+    const c = m === 'ocEq' ? 'O' : 'I', Q = P[c];
+    tri();
+    NAMES.forEach(n => { const F = foot(Q, ...opp(n)); D['F' + n] = F; a_.seg(Q, P[n], 'sub', 1.6, true); a_.seg(Q, F, 'sub', 1.6, true); a_.right(F, opp(n)[1], Q); });   // 頂点への 線と 辺への 線を 両方 同じ 点線で（片方だけだと 答えが 見える）
+    a_.dot(Q); a_.lab(Q, c, 'pt');
+    if (c === 'O') { NAMES.forEach(n => { z.seg(Q, P[n], 'ok', 2.6); z.tick(Q, P[n], 1, 'ok'); }); z.circ(Q, outR); }
+    else { NAMES.forEach(n => { z.seg(Q, D['F' + n], 'ok', 2.6); z.tick(Q, D['F' + n], 1, 'ok'); }); z.circ(Q, inR); }
+  }
+  if (m === 'ocPlace' || m === 'icPlace') {
+    tri();
+    if (q.v !== 'ac') { const R = R_OF(q), [y, zz] = OTH[R]; if (q.v === 'rt') a_.right(P[R], P[y], P[zz]); else a_.ang(P[R], P[y], P[zz], '', 'mk', 16); }
+    const c = m === 'ocPlace' ? 'O' : 'I';
+    z.dot(P[c], 'ok', 5.5); z.lab(P[c], c, 'ok'); z.circ(P[c], c === 'O' ? outR : inR);
+    D[c] = P[c];
+  }
+  if (m === 'ocAngle' || m === 'mabOc') {
+    tri();
+    NAMES.forEach(n => a_.seg(P.O, P[n], 'cy', 1.8));
+    a_.dot(P.O); a_.lab(P.O, 'O', 'pt');
+    a_.ang(P[X], P.O, P[Y], '?', 'mk', 26, true);
+    if (m === 'mabOc' && !s2) { z.poly([P.O, P[X], P[Y]], 'shg'); z.tick(P.O, P[X], 1, 'ok'); z.tick(P.O, P[Y], 1, 'ok'); }
+    else {
+      if (m === 'mabOc') { ask.unshift({ k: 'poly', ps: [P.O, P[X], P[Y]], c: 'shg' }); a_.tick(P.O, P[X], 1); a_.tick(P.O, P[Y], 1); }
+      else { z.tick(P.O, P[X], 1, 'ok'); z.tick(P.O, P[Y], 1, 'ok'); }
+      z.seg(P.O, P[X], 'ok', 2.6); z.seg(P.O, P[Y], 'ok', 2.6);
+      z.ang(P[X], P.O, P[Y], '○', 'ok', 26); z.ang(P[Y], P.O, P[X], '○', 'ok', 26);
+    }
+  }
+  if (m === 'icAngle') {
+    tri();
+    NAMES.forEach(n => a_.seg(P.I, P[n], 'cy', 1.8));
+    a_.dot(P.I); a_.lab(P.I, 'I', 'pt');
+    a_.ang(P[X], P.I, P[Y], '?', 'mk', 26, true);
+    z.seg(P[X], P.I, 'ok', 2.6); z.ang(P[X], P[Y], P.I, '×', 'ok', 26); z.ang(P[X], P.I, P[Z], '×', 'ok', 26);
+  }
+  if (m === 'mabIc') {
+    const F = bisFoot('A'); D.D = F;
+    tri();
+    if (!s2) {
+      a_.seg(P.B, P.I, 'cy', 1.6); a_.seg(P.C, P.I, 'cy', 1.6); a_.seg(P.A, P.I, 'cy', 1.8); a_.seg(P.I, F, 'cy', 1.8, true);
+      a_.dot(P.I); a_.lab(P.I, 'I', 'pt'); a_.dot(F, 'w', 3.5); a_.lab(F, 'D');
+      z.seg(P.A, F, 'ok', 2.6); z.ang(P.A, P.B, F, '○', 'ok'); z.ang(P.A, F, P.C, '○', 'ok');
+    } else {
+      a_.seg(P.A, F, 'cy', 2); a_.ang(P.A, P.B, F, '○'); a_.ang(P.A, F, P.C, '○'); a_.dot(F, 'w', 3.5); a_.lab(F, 'D');
+      a_.num(P.A, P.B, String(q.sd[0])); a_.num(P.A, P.C, String(q.sd[1]));
+      z.seg(P.B, F, 'or', 4.5); z.seg(F, P.C, 'bl', 4.5); z.seg(P.A, P.B, 'or', 2.6); z.seg(P.A, P.C, 'bl', 2.6);
+      z.num(P.A, P.B, String(q.sd[0]), 'or'); z.num(P.A, P.C, String(q.sd[1]), 'bl');
+    }
+  }
+  if (m === 'gRatio' || m === 'gFrac' || m === 'mabG') {
+    const V = m === 'mabG' ? 'A' : X, [y, zz] = OTH[V], M = sideMid(V); D.D = M;
+    tri();
+    NAMES.filter(n => n !== V).forEach(n => a_.seg(P[n], sideMid(n), 'sub', 1.2, true));
+    a_.seg(P[V], M, 'cy', 2.2); a_.tick(P[y], M, 2); a_.tick(M, P[zz], 2);
+    a_.dot(P.G); a_.lab(P.G, 'G', 'pt'); a_.dot(M, 'w', 3.5); a_.lab(M, MED[V]);
+    if (m === 'mabG') a_.num(P[V], M, String(q.L), 'cy', P[y]);
+    const big = m !== 'mabG' || s2;
+    if (big) {
+      const one = m === 'mabG' && q.ask === 'GD';
+      if (!one) z.seg(P[V], P.G, 'ok', 4.5);
+      z.seg(P.G, M, one ? 'ok' : 'or', 4.5);
+      if (m !== 'mabG') { z.num(P[V], P.G, '2', 'ok', P[zz]); z.num(P.G, M, '1', 'or', P[zz]); }
+    } else { z.seg(P.G, M, 'ok', 4.5); z.dot(lerp(P[V], M, 1 / 3), 'ok', 3.5); z.dot(P.G, 'ok', 5); }   // AD を 比の 3つ分に 分ける
+  }
+  if (m === 'gMid') {
+    const M = meet(P.A, P.G, P.B, P.C); D.D = M;
+    tri();
+    a_.seg(P.A, P.G, 'cy', 2.2); a_.seg(P.G, M, 'cy', 1.8, true);
+    a_.dot(P.G); a_.lab(P.G, 'G', 'pt'); a_.dot(M, 'w', 3.5); a_.lab(M, 'D');
+    z.seg(P.G, M, 'ok', 2.6); z.tick(P.B, M, 1, 'ok'); z.tick(M, P.C, 1, 'ok');
+  }
+  if (m === 'arSame') {
+    if (q.v === 'G') {
+      a_.poly([P.G, P.B, P.C], 'sh1'); tri(); a_.dot(P.G); a_.lab(P.G, 'G', 'pt');
+      z.seg(P.B, P.C, 'ok', 4.5); altitude(z, P.A, P.B, P.C); altitude(z, P.G, P.B, P.C);
+    } else {
+      const F = q.v === 'M' ? sideMid('A') : lerp(P.B, P.C, q.t); D.D = F;
+      a_.poly([P.A, P.B, F], 'sh1'); a_.poly([P.A, F, P.C], 'sh2'); tri();
+      a_.seg(P.A, F, 'cy', 2); a_.dot(F, 'w', 3.5); a_.lab(F, 'D');
+      if (q.v === 'M') { a_.tick(P.B, F, 1); a_.tick(F, P.C, 1); }
+      altitude(z, P.A, P.B, P.C);
+      if (q.v === 'M') { z.tick(P.B, F, 1, 'ok'); z.tick(F, P.C, 1, 'ok'); }
+    }
+  }
+  if (m === 'arHeight') {
+    const [p, r] = q.bd, F = lerp(P.B, P.C, p / (p + r)); D.D = F;
+    if (q.v === 'whole') a_.poly([P.A, P.B, F], 'sh1'); else { a_.poly([P.A, P.B, F], 'sh1'); a_.poly([P.A, F, P.C], 'sh2'); }
+    tri(); a_.seg(P.A, F, 'cy', 2); a_.dot(F, 'w', 3.5); a_.lab(F, 'D');
+    a_.num(P.B, F, String(p), 'cy', P.A); a_.num(F, P.C, String(r), 'cy', P.A);
+    altitude(z, P.A, P.B, P.C); z.seg(P.B, F, 'or', 4.5); z.seg(F, P.C, 'bl', 4.5);
+  }
+  if (m === 'arBase') {
+    const [y, zz] = OTH[X], M = sideMid(X); D.D = M;
+    a_.poly([P.G, P[y], P[zz]], 'sh1'); tri();
+    a_.seg(P[X], M, 'cy', 1.8); a_.dot(P.G); a_.lab(P.G, 'G', 'pt'); a_.dot(M, 'w', 3.5); a_.lab(M, MED[X]);
+    altitude(z, P[X], P[y], P[zz]); altitude(z, P.G, P[y], P[zz]);
+  }
+  if (m === 'mabAr') {
+    const F = bisFoot('A'); D.D = F;
+    a_.poly([P.A, P.B, F], 'sh1'); a_.poly([P.A, F, P.C], 'sh2'); tri();
+    a_.seg(P.A, F, 'cy', 2); a_.ang(P.A, P.B, F, '○'); a_.ang(P.A, F, P.C, '○'); a_.dot(F, 'w', 3.5); a_.lab(F, 'D');
+    if (s2) { a_.num(P.A, P.B, String(q.sd[0])); a_.num(P.A, P.C, String(q.sd[1])); z.seg(P.B, F, 'or', 4.5); z.seg(F, P.C, 'bl', 4.5); z.num(P.A, P.B, String(q.sd[0]), 'or'); z.num(P.A, P.C, String(q.sd[1]), 'bl'); }
+    altitude(z, P.A, P.B, P.C);
+  }
+  NAMES.forEach(n => { a_.dot(P[n], 'w', 4); a_.lab(P[n], n); });   // 頂点（いちばん 上に）
+  return { pts: Object.assign({}, P, D), ask, ans, tri: [P.A, P.B, P.C] };
+}
+
+// ---------- 選択肢 ----------
+const PTS = ['外心', '内心', '重心'];
+const PT_OF = { perp: '外心', bis: '内心', med: '重心', vtx: '外心', circ: '外心', side: '内心', inc: '内心', g21: '重心' };
+const LINE_KINDS = [['med', '中線'], ['bis', '角の 二等分線'], ['perp', '垂直二等分線']];
+const LINE_JP = { med: '中線', bis: '角の 二等分線', perp: '垂直二等分線' };
+const triO = (c, x, y) => { const s = [x, y].sort().join(''); return '△' + c + (s === 'AC' ? 'CA' : s); };   // △OAB・△OBC・△OCA
+function makeOptions(q, rng) {
+  const c = [], add = (text, types) => c.push({ text, types });
+  const m = q.mode, s2 = q.st2 === 2, [X, Y] = q.x || ['A', 'B'], Z = third(X, Y);
+  let fixed = false;
+  if (m === 'whichPt' || m === 'whichProp' || (m === 'mabLine' && s2)) { fixed = true; PTS.forEach(t => add(t, t === PT_OF[q.v] ? [] : [m === 'whichProp' ? 'propPt' : 'linePt'])); }
+  if (m === 'mabLine' && !s2) { fixed = true; LINE_KINDS.forEach(([v, t]) => add(t, v === q.v ? [] : ['lineKind'])); }
+  if (m === 'ocEq' || m === 'icEq') {
+    const p = m === 'ocEq' ? 'O' : 'I'; fixed = true;
+    add(p + 'A ＝ ' + p + 'B ＝ ' + p + 'C', m === 'ocEq' ? [] : ['eqVtx']);
+    add(p + ' から 3辺 までの 距離', m === 'icEq' ? [] : ['eqSide']);
+    add('AB ＝ BC ＝ CA', ['eqEdge']);
+  }
+  if (m === 'ocPlace' || m === 'icPlace') {
+    fixed = true; const right = m === 'icPlace' ? 'in' : { ac: 'in', rt: 'on', ob: 'out' }[q.v];
+    [['in', '三角形の 内側'], ['on', '三角形の 辺の 上'], ['out', '三角形の 外側']].forEach(([k, t]) => add(t, k === right ? [] : [m === 'ocPlace' ? 'placeO' : 'placeI']));
+  }
+  if (m === 'ocAngle' || (m === 'mabOc' && s2)) { add('∠O' + Y + X, []); add('∠O' + X + Z, ['ocNext']); add('∠O' + Z + Y, ['ocOther']); }
+  if (m === 'mabOc' && !s2) { add(triO('O', X, Y), []); add(triO('O', X, Z), ['isoT']); add(triO('O', Y, Z), ['isoT']); }
+  if (m === 'icAngle') { add('∠I' + X + Z, []); add('∠I' + Y + X, ['icBase']); add('∠I' + Z + X, ['icOther']); }
+  if (m === 'mabIc' && !s2) { fixed = true; add('∠A の 二等分線', []); add('中線', ['icLine']); add('BC の 垂直二等分線', ['icLine']); }
+  if ((m === 'mabIc' || m === 'mabAr') && s2) { const [cc, b] = q.sd; add(cc + ' : ' + b, []); add(b + ' : ' + cc, ['swapS']); add(m === 'mabIc' ? '1 : 1' : cc + ' : ' + (cc + b), [m === 'mabIc' ? 'midR' : 'wholeA']); }
+  if (m === 'gRatio') { const r = q.ask === 'AG' ? [2, 1] : [1, 2]; add(r[0] + ' : ' + r[1], []); add(r[1] + ' : ' + r[0], ['gSwap']); add('1 : 1', ['gHalf']); }
+  if (m === 'gMid') { fixed = true; add('BC の 中点', []); add('BD : DC ＝ AB : AC と なる 点', ['gBis']); add('A から BC に 下ろした 垂線の 足', ['gAlt']); }
+  if (m === 'gFrac') { const ag = q.ask === 'AG'; add(ag ? '{2|3}' : '{1|3}', []); add(ag ? '{1|3}' : '{2|3}', ['gPart']); add('{1|2}', ['gRatioF']); }
+  if (m === 'mabG') {
+    const L = q.L;
+    if (!s2) { add(fracStr(L, 3), []); add(fracStr(L, 2), ['gHalf2']); add(String(L), ['gWhole']); }
+    else if (q.ask === 'AG') { add(fracStr(2 * L, 3), []); add(fracStr(L, 3), ['gOther']); add(fracStr(L, 2), ['gHalf2']); }
+    else { add(fracStr(L, 3), []); add(fracStr(2 * L, 3), ['gOther']); add(fracStr(L, 2), ['gHalf2']); }
+  }
+  if (m === 'arSame' || (m === 'mabAr' && !s2)) {
+    fixed = true; const right = m === 'mabAr' ? 'h' : { D: 'h', M: 'hb', G: 'b' }[q.v];
+    [['h', '高さだけ'], ['b', '底辺だけ'], ['hb', '高さも 底辺も']].forEach(([k, t]) => add(t, k === right ? [] : ['arWhich']));
+  }
+  if (m === 'arHeight') {
+    const [p, r] = q.bd, s = p + r;
+    if (q.v === 'pair') { add(p + ' : ' + r, []); add(r + ' : ' + p, ['swapS']); add(p + ' : ' + s, ['wholeA']); }
+    else { add(p + ' : ' + s, []); add(p + ' : ' + r, ['pairA']); add(r + ' : ' + s, ['otherA']); }
+  }
+  if (m === 'arBase') { add('1 : 3', []); add('1 : 2', ['gSwapA']); add('2 : 3', ['gArea']); }
+  const seen = new Set(), out = [];
+  for (const x of c) { if (seen.has(x.text)) continue; seen.add(x.text); out.push({ text: x.text, types: x.types, correct: !x.types.length }); }
+  return fixed ? out : shuffle(rng, out);
+}
+
+// ---------- 問題の 文：[ラベル, 短い 言い方]、問題集の ことば ----------
+function placeWord(q, exam) {
+  const R = q.an ? R_OF(q) : 'A';
+  if (q.v === 'ac') return exam ? '鋭角三角形' : '鋭角三角形 ABC';
+  if (q.v === 'rt') return exam ? '∠' + R + ' ＝ 90° の 直角三角形' : '∠' + R + ' ＝ 90° の △ABC';
+  return exam ? '∠' + R + ' が 鈍角の 鈍角三角形' : '∠' + R + ' が 鈍角の △ABC';
+}
+const PROP_JP = {
+  vtx: ['P から 3つの 頂点 までの 距離が 等しい（PA ＝ PB ＝ PC）', '3つの 頂点から 等しい 距離に ある'],
+  side: ['P から 3辺 までの 距離が 等しい', '3辺から 等しい 距離に ある'],
+  circ: ['P は △ABC の 外接円の 中心', '△ABC の 外接円の 中心で ある'],
+  inc: ['P は △ABC の 内接円の 中心', '△ABC の 内接円の 中心で ある'],
+  g21: ['P は 中線 AD を 2 : 1 に 内分する 点', '中線 AD を 2 : 1 に 内分する 点で ある'],
+};
+function texts(q) {
+  const m = q.mode, s2 = q.st2 === 2, [X, Y] = q.x || ['A', 'B'], Z = third(X, Y), Dn = MED[X];
+  const T = {
+    whichPt: () => [['▼ どの 点？', '3本の 線の 交点 P は？（図の 印を 見る）'], ['図の 3直線の 交点 P は、△ABC の 外心・内心・重心の どれか。図の 印から 答えよ。']],
+    whichProp: () => [['▼ どの 点？', PROP_JP[q.v][0] + '。P は？'], ['△ABC の 点 P は ' + PROP_JP[q.v][1] + '。点 P は 外心・内心・重心の どれか。']],
+    mabLine: () => (s2 ? [['▼ ② 交点は？', '3本 とも ' + LINE_JP[q.v] + ' なら、交点 P は？'], ['△ABC の 3本の ' + LINE_JP[q.v] + 'の 交点 P は 何か。']]
+      : [['▼ ① 何の 線？', '図の 水色の 線は 何の 線？（印を 見る）'], ['図の 水色の 線は 何か。図の 印から 答えよ。']]),
+    ocEq: () => [['▼ 等しい 長さは？', 'O は △ABC の 外心。等しいのは？'], ['点 O は △ABC の 外心で ある。長さが 等しい ものを 答えよ。']],
+    icEq: () => [['▼ 等しい 長さは？', 'I は △ABC の 内心。等しいのは？'], ['点 I は △ABC の 内心で ある。長さが 等しい ものを 答えよ。']],
+    ocPlace: () => [['▼ どの 範囲？', placeWord(q) + '。外心 O は どの 範囲に ある？'], ['△ABC は ' + placeWord(q, true) + 'で ある。外心 O は どの 範囲に あるか。']],
+    icPlace: () => [['▼ どの 範囲？', placeWord(q) + '。内心 I は どの 範囲に ある？'], ['△ABC は ' + placeWord(q, true) + 'で ある。内心 I は どの 範囲に あるか。']],
+    ocAngle: () => [['▼ 等しい 角は？', 'O は △ABC の 外心。∠O' + X + Y + ' と 等しい 角は？'], ['点 O は △ABC の 外心で ある。∠O' + X + Y + ' と 等しい 角を 答えよ。']],
+    mabOc: () => (s2 ? [['▼ ② 等しい 角は？', 'O は 外心。' + triO('O', X, Y) + ' は 二等辺三角形（O' + X + ' ＝ O' + Y + '）。∠O' + X + Y + ' と 等しい 角は？'], ['点 O は △ABC の 外心で ある。∠O' + X + Y + ' と 等しい 角を 答えよ。']]
+      : [['▼ ① どの 二等辺三角形？', 'O は 外心。∠O' + X + Y + ' と 等しい 角を さがす。どの 二等辺三角形に 注目？'], ['点 O は △ABC の 外心で ある。∠O' + X + Y + ' と 等しい 角を 求める ために 注目する 二等辺三角形は どれか。']]),
+    icAngle: () => [['▼ 等しい 角は？', 'I は △ABC の 内心。∠I' + X + Y + ' と 等しい 角は？'], ['点 I は △ABC の 内心で ある。∠I' + X + Y + ' と 等しい 角を 答えよ。']],
+    mabIc: () => (s2 ? [['▼ ② BD : DC は？', 'AB ＝ ' + q.sd[0] + '、AC ＝ ' + q.sd[1] + '。AD は ∠A の 二等分線。BD : DC ＝ ？'], ['△ABC で AB ＝ ' + q.sd[0] + '、AC ＝ ' + q.sd[1] + ' と する。BD : DC を 求めよ。']]
+      : [['▼ ① 何の 線？', 'I は △ABC の 内心。AI を 延ばした AD は 何の 線？'], ['点 I は △ABC の 内心で ある。直線 AI と 辺 BC の 交点を D と する。AD は 何か。']]),
+    gRatio: () => { const r = q.ask === 'AG' ? X + 'G : G' + Dn : 'G' + Dn + ' : ' + X + 'G';
+      return [['▼ ' + r + ' は？', 'G は △ABC の 重心、' + X + Dn + ' は 中線。' + r + ' ＝ ？'], ['点 G は △ABC の 重心、' + X + Dn + ' は 中線で ある。' + r + ' を 求めよ。']]; },
+    gFrac: () => { const s = q.ask === 'AG' ? X + 'G' : 'G' + Dn;
+      return [['▼ 何分の何？', 'G は 重心、' + X + Dn + ' は 中線。' + s + ' は ' + X + Dn + ' の 何分の何？'], ['点 G は △ABC の 重心、' + X + Dn + ' は 中線で ある。' + s + ' は ' + X + Dn + ' の 何倍か。']]; },
+    gMid: () => [['▼ D は どんな 点？', 'G は △ABC の 重心。AG を 延ばして BC と 交わる 点 D は？'], ['点 G は △ABC の 重心で ある。直線 AG と 辺 BC の 交点を D と する。点 D は どのような 点か。']],
+    mabG: () => (s2 ? [['▼ ② ' + q.ask + ' は？', 'AD ＝ ' + q.L + '。G は △ABC の 重心。' + q.ask + ' の 長さは？'], ['△ABC の 重心を G、中線 AD ＝ ' + q.L + ' と する。' + q.ask + ' の 長さを 求めよ。']]
+      : [['▼ ① 比の 1つ分は？', 'AD ＝ ' + q.L + '。G は △ABC の 重心。比の 1つ分の 長さは？'], ['△ABC の 重心を G、中線 AD ＝ ' + q.L + ' と する。AG : GD の 比の 1 あたりの 長さを 求めよ。']]),
+    arSame: () => {
+      if (q.v === 'G') return [['▼ 等しいのは？', 'G は △ABC の 重心。△GBC と △ABC で 等しいのは？'], ['点 G は △ABC の 重心で ある。△GBC と △ABC で 等しい ものを 答えよ。']];
+      if (q.v === 'M') return [['▼ 等しいのは？', 'AD は 中線。△ABD と △ADC で 等しいのは？'], ['△ABC の 中線を AD と する。△ABD と △ADC で 等しい ものを 答えよ。']];
+      return [['▼ 等しいのは？', 'D は 辺 BC 上の 点。△ABD と △ADC で 等しいのは？'], ['△ABC の 辺 BC 上に 点 D を とる。△ABD と △ADC で 等しい ものを 答えよ。']]; },
+    arHeight: () => { const w = q.v === 'pair' ? '△ABD : △ADC' : '△ABD : △ABC';
+      return [['▼ 面積の 比は？', 'BD ＝ ' + q.bd[0] + '、DC ＝ ' + q.bd[1] + '。' + w + ' ＝ ？'], ['△ABC の 辺 BC 上に BD ＝ ' + q.bd[0] + '、DC ＝ ' + q.bd[1] + ' と なる 点 D を とる。' + w + ' を 求めよ。']]; },
+    arBase: () => { const w = triO('G', ...OTH[X]) + ' : △ABC';
+      return [['▼ 面積の 比は？', 'G は △ABC の 重心。' + w + ' ＝ ？'], ['点 G は △ABC の 重心で ある。' + w + ' を 求めよ。']]; },
+    mabAr: () => (s2 ? [['▼ ② 面積の 比は？', 'AB ＝ ' + q.sd[0] + '、AC ＝ ' + q.sd[1] + '。AD は ∠A の 二等分線。△ABD : △ADC ＝ ？'], ['△ABC で AB ＝ ' + q.sd[0] + '、AC ＝ ' + q.sd[1] + '、∠A の 二等分線を AD と する。△ABD : △ADC を 求めよ。']]
+      : [['▼ ① 等しいのは？', 'AD は ∠A の 二等分線。△ABD と △ADC で 等しいのは？'], ['△ABC の ∠A の 二等分線を AD と する。△ABD と △ADC で 等しい ものを 答えよ。']]),
+  };
+  return T[m]();
+}
+
+// ---------- 理由（短く、ノートの ことばで）----------
+function reasonLines(q) {
+  const m = q.mode, s2 = q.st2 === 2, [X, Y] = q.x || ['A', 'B'], Z = third(X, Y), Dn = MED[X];
+  const LINE_WHY = {
+    perp: ['辺の 中点（／）で 直角に 交わる 線 → 垂直二等分線', '3辺の 垂直二等分線の 交点 → 外心（外接円の 中心）'],
+    bis: ['角を 2つに 分ける 線（○ × △）→ 角の 二等分線', '3つの 角の 二等分線の 交点 → 内心（内接円の 中心）'],
+    med: ['頂点と 向かいの 辺の 中点（／）を 結ぶ 線 → 中線', '3本の 中線の 交点 → 重心'],
+  };
+  switch (m) {
+    case 'whichPt': return LINE_WHY[q.v].slice();
+    case 'whichProp': return [{ vtx: '3つの 頂点から 等しい 距離 → P を 中心に A・B・C を 通る 円（外接円）→ 外心', side: '3辺から 等しい 距離 → P を 中心に 3辺に 接する 円（内接円）→ 内心',
+      circ: '外接円（3つの 頂点を 通る 円）の 中心 → 外心', inc: '内接円（3辺に 接する 円）の 中心 → 内心', g21: '中線を 頂点の ほうから 2 : 1 に 内分する 点 → 重心' }[q.v]];
+    case 'mabLine': return s2 ? [LINE_WHY[q.v][1]] : [{ med: 'BD ＝ DC（／）→ D は BC の 中点 → A と 中点を 結ぶ 線は 中線', bis: '∠BAD ＝ ∠DAC（○）→ ∠A を 2つに 分ける → 角の 二等分線', perp: 'BD ＝ DC（／）で BC に 直角 → BC の 垂直二等分線（A を 通らない）' }[q.v],
+      { med: '角の 二等分線に 見えても、印は 中点（／）だけ', bis: 'D は 中点 では ない（／ の 印が ない）', perp: '頂点と 結ぶ 線 では ない → 中線 では ない' }[q.v]];
+    case 'ocEq': return ['外心は 3つの 頂点から 等しい 距離 → OA ＝ OB ＝ OC', 'O を 中心に 外接円が かける（3辺から 等しいのは 内心）'];
+    case 'icEq': return ['内心は 3辺から 等しい 距離 → I を 中心に 内接円が かける', '（3つの 頂点から 等しいのは 外心）'];
+    case 'ocPlace': return [{ ac: '鋭角三角形 → 外心は 三角形の 内側', rt: '直角三角形 → 外心は 斜辺の 中点（辺の 上）', ob: '鈍角三角形 → 外心は 三角形の 外側' }[q.v], '外心は 外接円の 中心'];
+    case 'icPlace': return ['内心は 角の 二等分線の 交点 → どんな 三角形でも 内側', '（内接円の 中心。外側に 出るのは 鈍角三角形の 外心）'];
+    case 'ocAngle': return ['O' + X + ' ＝ O' + Y + '（外心）→ ' + triO('O', X, Y) + ' は 二等辺三角形', '二等辺三角形の 底角は 等しい → ∠O' + X + Y + ' ＝ ∠O' + Y + X];
+    case 'mabOc': return s2 ? ['O' + X + ' ＝ O' + Y + ' の 二等辺三角形', '二等辺三角形の 底角は 等しい → ∠O' + X + Y + ' ＝ ∠O' + Y + X]
+      : ['∠O' + X + Y + ' の 2辺 O' + X + '、' + X + Y + ' を ふくむ ' + triO('O', X, Y) + ' に 注目', 'O' + X + ' ＝ O' + Y + '（外心）→ 二等辺三角形'];
+    case 'icAngle': return [X + 'I は ∠' + X + ' の 二等分線（内心）', '角度を 隣へ よみかえる → ∠I' + X + Y + ' ＝ ∠I' + X + Z];
+    case 'mabIc': return s2 ? ['AD は ∠A の 二等分線 → 定理1（内角の 二等分線と 比）', 'BD : DC ＝ AB : AC ＝ ' + q.sd[0] + ' : ' + q.sd[1] + '（辺の 長さの まま）']
+      : ['内心は 角の 二等分線の 交点 → AI は ∠A の 二等分線', 'AI を 延ばした AD も ∠A の 二等分線'];
+    case 'gRatio': return ['重心は 中線を 頂点の ほうから 2 : 1 に 内分する', q.ask === 'AG' ? X + 'G : G' + Dn + ' ＝ 2 : 1' : 'G' + Dn + ' : ' + X + 'G ＝ 1 : 2'];
+    case 'gFrac': return [X + 'G : G' + Dn + ' ＝ 2 : 1 → ' + X + Dn + ' は 比の 3つ分', q.ask === 'AG' ? X + 'G は 比の 2つ分 → ' + X + Dn + ' の {2|3}' : 'G' + Dn + ' は 比の 1つ分 → ' + X + Dn + ' の {1|3}'];
+    case 'gMid': return ['重心は 中線の 交点 → AD は 中線', 'D は BC の 中点（BC を 1 : 1 に 内分）'];
+    case 'mabG': return s2 ? [q.ask === 'AG' ? 'AG は 比の 2つ分 → ' + fracStr(q.L, 3) + ' × 2 ＝ ' + fracStr(2 * q.L, 3) : 'GD は 比の 1つ分 → ' + fracStr(q.L, 3)]
+      : ['AG : GD ＝ 2 : 1 → AD は 比の 3つ分', '1つ分 ＝ ' + q.L + ' × {1|3} ＝ ' + fracStr(q.L, 3)];
+    case 'arSame': return { D: ['頂点 A が 同じ・底辺 BD、DC が 一直線上 → 高さが 等しい', '底辺 BD と DC は ちがう'], M: ['頂点 A が 同じ・底辺が 一直線上 → 高さが 等しい', 'AD は 中線 → BD ＝ DC → 底辺も 等しい'],
+      G: ['底辺 BC が 同じ → 底辺が 等しい', '頂点 A と G で 高さは ちがう'] }[q.v].slice();
+    case 'arHeight': return ['高さが 等しい とき 面積比は 底辺比で よみかえる', q.v === 'pair' ? '△ABD : △ADC ＝ BD : DC ＝ ' + q.bd[0] + ' : ' + q.bd[1] : '△ABD : △ABC ＝ BD : BC ＝ ' + q.bd[0] + ' : ' + (q.bd[0] + q.bd[1])];
+    case 'arBase': { const [y, zz] = OTH[X]; return ['底辺 ' + y + zz + ' が 同じ → 面積比は 高さの 比', 'G' + Dn + ' : ' + X + Dn + ' ＝ 1 : 3 → 高さも 1 : 3']; }
+    case 'mabAr': return s2 ? ['高さが 等しい → △ABD : △ADC ＝ BD : DC', 'BD : DC ＝ AB : AC ＝ ' + q.sd[0] + ' : ' + q.sd[1] + '（定理1）'] : ['頂点 A が 同じ・底辺 BD、DC が 一直線上 → 高さが 等しい', '（BD ≠ DC なので 底辺は ちがう）'];
+  }
+  return [];
+}
+
+// ---------- 問題の 形（＝ モンスター）と 章 ----------
+const CHAPTERS = [
+  { ch: 1, lv: 1, title: '第1章 どの 点？', forms: ['whichPt', 'whichProp'], plays: [['whichPt', 'whichProp'], ['whichProp', 'whichPt'], ['whichPt', 'MAB']], intro: true,
+    mab: { form: 'mabLine', name: 'ミワケヌシ', sprite: '🔍', tip: 'まず 印で 線の 種類を 決める → 3本 とも その 線なら 交点が 決まる' },
+    boss: { name: 'コウテンオウ', sprite: '🏰' } },
+  { ch: 2, lv: 2, title: '第2章 外心', forms: ['ocEq', 'ocPlace', 'ocAngle'], plays: [['ocEq', 'ocPlace'], ['ocAngle', 'ocEq'], ['ocPlace', 'MAB']],
+    mab: { form: 'mabOc', name: 'ニトウヘン', sprite: '🔻', tip: 'その 角を ふくむ 二等辺三角形に 注目 → 底角は 等しい' },
+    boss: { name: 'ガイシンオウ', sprite: '🌕' } },
+  { ch: 3, lv: 3, title: '第3章 内心', forms: ['icEq', 'icAngle', 'icPlace'], plays: [['icEq', 'icAngle'], ['icPlace', 'icEq'], ['icAngle', 'MAB']],
+    mab: { form: 'mabIc', name: 'ノビルセン', sprite: '🎋', tip: 'AI を 延ばすと ∠A の 二等分線 → BD : DC ＝ AB : AC（辺の 長さの まま）' },
+    boss: { name: 'ナイシンオウ', sprite: '🎯' } },
+  { ch: 4, lv: 4, title: '第4章 重心', forms: ['gRatio', 'gMid', 'gFrac'], plays: [['gRatio', 'gMid'], ['gFrac', 'gRatio'], ['gMid', 'MAB']],
+    mab: { form: 'mabG', name: 'ジュウシンボウ', sprite: '🪀', tip: 'AD は 比の 3つ分 → 1つ分 ＝ AD × {1|3}（割り切れなくて よい）' },
+    boss: { name: 'ジュウシンオウ', sprite: '🗿' } },
+  { ch: 5, lv: 5, title: '第5章 面積の 比', forms: ['arSame', 'arHeight', 'arBase'], plays: [['arSame', 'arHeight'], ['arBase', 'arSame'], ['arHeight', 'MAB']],
+    mab: { form: 'mabAr', name: 'メンセキヨミ', sprite: '🧩', tip: '高さが 等しい → 面積比は 底辺比 → 二等分線なら AB : AC' },
+    boss: { name: 'メンセキオウ', sprite: '🏯' } },
+  { ch: 6, final: true, title: 'さいごの 章', boss: { name: 'サンシンテイ', sprite: '⚜️' } },
+];
+const DATA_V = 1;
+function migrateProg(pr) { return { stars: {}, gained: 0, done: false, v: DATA_V }; }
+function migrateZk(zk) { return { _v: DATA_V }; }
+const NORM_CH = CHAPTERS.filter(c => !c.final);
+const FORM_LV = {};
+NORM_CH.forEach(c => c.forms.forEach(f => { FORM_LV[f] = c.lv; }));
+NORM_CH.forEach(c => { if (c.mab) FORM_LV[c.mab.form] = c.lv; });
+const MAB_FORMS = NORM_CH.map(c => c.mab.form);
+const MONSTERS = [
+  ['whichPt', 'センミワケ', '👀', '中点で 直角 → 垂直二等分線（外心）、角を 分ける → 角の 二等分線（内心）、頂点と 中点 → 中線（重心）'],
+  ['whichProp', 'トクチョウ', '🏷️', '頂点から 等しい・外接円 → 外心、辺から 等しい・内接円 → 内心、中線を 2 : 1 → 重心'],
+  ['ocEq', 'ミツドモエ', '🌀', '外心は 3つの 頂点から 等しい 距離（OA ＝ OB ＝ OC）'],
+  ['ocPlace', 'ハミダシ', '🛸', '外心は 鋭角 → 内側、直角 → 斜辺の 中点、鈍角 → 外側'],
+  ['ocAngle', 'ソコカク', '📐', 'OB ＝ OC → 二等辺三角形の 底角は 等しい'],
+  ['icEq', 'ヘンキョリ', '📏', '内心は 3辺から 等しい 距離（内接円の 中心）'],
+  ['icAngle', 'ハサミウチ', '✂️', '内心は 角の 二等分線 → 角度を 隣へ よみかえる'],
+  ['icPlace', 'ウチガワ', '🏠', '内心は どんな 三角形でも 内側'],
+  ['gRatio', 'ナカワリ', '⚖️', '重心は 中線を 頂点の ほうから 2 : 1 に 内分'],
+  ['gMid', 'チュウテン', '📍', 'AG を 延ばすと BC の 中点（1 : 1 に 内分）'],
+  ['gFrac', 'サンブン', '🍰', 'AG は AD の {2|3}、GD は AD の {1|3}'],
+  ['arSame', 'タカサミ', '🗻', '頂点が 同じで 底辺が 一直線上 → 高さが 等しい'],
+  ['arHeight', 'ソコヘンヒ', '🧱', '高さが 等しい とき 面積比は 底辺比で よみかえる'],
+  ['arBase', 'タカサヒ', '🏔️', '底辺が 等しい とき 面積比は 高さの 比（重心なら 1 : 3）'],
+].map(([id, name, sprite, tip]) => ({ id, ch: FORM_LV[id], name, sprite, tip }))
+  .concat(NORM_CH.map(c => ({ id: c.mab.form, ch: c.ch, name: c.mab.name, sprite: c.mab.sprite, tip: c.mab.tip, mab: true })))
+  .concat(NORM_CH.map(c => ({ id: 'boss' + c.ch, ch: c.ch, name: c.boss.name, sprite: c.boss.sprite, tip: '中ボス：' + c.title.replace(/^第\d章 /, '') + 'を 問題集の ことばで', boss: true })))
+  .concat([{ id: 'final', ch: CHAPTERS.length, name: CHAPTERS[CHAPTERS.length - 1].boss.name, sprite: CHAPTERS[CHAPTERS.length - 1].boss.sprite, tip: 'さいごの ボス：' + NORM_CH.length + 'つの 章を 問題集の ことばで', boss: true }]);
+const monsterOf = id => MONSTERS.find(m => m.id === id);
+function zukanAfter(zk, e) {
+  const z = Object.assign({}, zk), cur = z[e.id] || 0;
+  if (e.type === 'kill') z[e.id] = Math.max(cur, 1);
+  if (e.type === 'master') z[e.id] = 2;
+  if (e.type === 'boss') z[e.id] = Math.max(cur, e.noMiss ? 2 : 1);
+  return z;
+}
+function zukanCount(zk) {
+  const v = m => zk[m.id] || 0, base = MONSTERS.filter(m => !m.mab), mabs = MONSTERS.filter(m => m.mab);
+  const got = MONSTERS.filter(m => v(m) >= 1).length, mas = MONSTERS.filter(m => v(m) >= 2).length;
+  return { got, mas, all: MONSTERS.length, mabGot: mabs.filter(m => v(m) >= 1).length, mabAll: mabs.length,
+    comp: base.every(m => v(m) >= 1), shin: MONSTERS.every(m => v(m) >= 1), perfect: MONSTERS.every(m => v(m) >= 2) };
+}
+
+// ---------- 問題を つくる ----------
+const pair2 = rng => { const x = pick(rng, NAMES); return [x, pick(rng, NAMES.filter(n => n !== x))]; };
+const GEN = {
+  whichPt: rng => ({ v: pick(rng, ['perp', 'bis', 'med']), an: pick(rng, ACUTE) }),
+  whichProp: rng => ({ v: pick(rng, ['vtx', 'circ', 'side', 'inc', 'g21', 'g21']), an: pick(rng, ACUTE) }),
+  mabLine: rng => { const v = pick(rng, ['med', 'bis', 'perp']); return { v, an: pick(rng, v === 'perp' ? FAR : NEAR) }; },
+  ocEq: rng => ({ an: pick(rng, ACUTE) }),
+  icEq: rng => ({ an: pick(rng, ACUTE) }),
+  ocPlace: rng => { const v = pick(rng, ['ac', 'rt', 'ob']); return { v, an: pick(rng, v === 'ac' ? ACUTE : v === 'rt' ? RIGHT : OBT) }; },
+  icPlace: rng => { const v = pick(rng, ['ac', 'rt', 'ob', 'ob']); return { v, an: pick(rng, v === 'ac' ? ACUTE : v === 'rt' ? RIGHT : OBT) }; },   // 鈍角でも 内心は 内側（鈍角を 多めに）
+  ocAngle: rng => ({ an: pick(rng, ACUTE), x: pair2(rng) }),
+  mabOc: rng => ({ an: pick(rng, ACUTE), x: pair2(rng) }),
+  icAngle: rng => ({ an: pick(rng, ACUTE), x: pair2(rng) }),
+  mabIc: rng => ({ sd: pick(rng, SD) }),
+  gRatio: rng => ({ an: pick(rng, ACUTE), x: [pick(rng, NAMES)], ask: pick(rng, ['AG', 'GD']) }),
+  gFrac: rng => ({ an: pick(rng, ACUTE), x: [pick(rng, NAMES)], ask: pick(rng, ['AG', 'GD']) }),
+  gMid: rng => ({ an: pick(rng, ACUTE) }),
+  mabG: rng => ({ an: pick(rng, ACUTE), L: pick(rng, rng() < 0.5 ? L_DIV : L_NON), ask: pick(rng, ['AG', 'GD']) }),
+  arSame: rng => { const v = pick(rng, ['D', 'D', 'M', 'G']); return Object.assign({ v, an: pick(rng, ACUTE) }, v === 'D' ? { t: pick(rng, T_LIST) } : {}); },
+  arHeight: rng => ({ v: pick(rng, ['pair', 'pair', 'whole']), an: pick(rng, ACUTE), bd: pick(rng, BD_PAIRS) }),
+  arBase: rng => ({ an: pick(rng, ACUTE), x: [pick(rng, NAMES)] }),
+  mabAr: rng => ({ sd: pick(rng, SD) }),
+};
+// x：[頂点, 2つめの 頂点]。gRatio・gFrac・arBase は 1つ（3つめは 使わない）。x[1] が ない ときの third は 使わない
+function genPrm(form, rng) { const r = GEN[form](rng); if (r.x && r.x.length === 1) r.x = [r.x[0], OTH[r.x[0]][0]]; return Object.assign({ mode: form, f: form }, r); }
+const TWO = MAB_FORMS;   // まぼろしは 連れ問（① → ②）
+function build(prm, rng, opt = {}) {
+  const q = prm, form = q.f || q.mode, lv = FORM_LV[form];
+  const p = { lv, kind: 'fwd', prm, mode: q.mode, form };
+  const mkStep = qq => { const [short, exam] = texts(qq); return { short, exam, options: makeOptions(qq, rng), reason: reasonLines(qq), fig: figure(qq) }; };
+  const one = mkStep(q);
+  [p.label, p.display] = one.short; p.options = one.options; p.reason = one.reason; p.fig = one.fig;
+  if (opt.boss) {
+    p.label = '▼ 問題集の ことばで'; p.display = one.exam[0]; p.exam = true;
+    p.shortText = one.short[1].length > 30 ? monsterOf(form).name + 'の 問題' : one.short[1];
+    p.reason = p.reason.concat(['この 問題は 第' + lv + '章の「' + p.shortText + '」と おなじ']);
+  }
+  p.long = p.display.length > 26;
+  if (TWO.includes(q.mode)) {
+    const two = mkStep(Object.assign({}, q, { st2: 2 }));
+    const s1 = { label: opt.boss ? '▼ 問題集の ことばで（①）' : p.label, display: p.display, reason: p.reason, options: p.options, fig: p.fig };
+    const s2 = { label: opt.boss ? '▼ 問題集の ことばで（②）' : two.short[0], display: opt.boss ? two.exam[0] : two.short[1], reason: two.reason, options: two.options, fig: two.fig };
+    p.steps = [s1, s2];
+    useStep(p, 0);
+  }
+  return p;
+}
+function useStep(p, i) {
+  const st = p.steps[i];
+  Object.assign(p, { stepIdx: i, label: st.label, display: st.display, reason: st.reason, options: st.options, fig: st.fig });
+  p.long = p.display.length > 26;
+  return p;
+}
+
+// ---------- 判定・間違い方 ----------
+function judge(p, ans) { return p.options[ans.opt].correct; }
+function classify(p, ans) { return { types: p.options[ans.opt].types.slice() }; }
+const TYPE_TEXT = {
+  linePt: '印を 読む：中点で 直角 → 垂直二等分線（外心）、角を 分ける → 角の 二等分線（内心）、頂点と 中点 → 中線（重心）',
+  propPt: '頂点から 等しい → 外心、辺から 等しい → 内心、中線を 2 : 1 → 重心',
+  lineKind: '／ は 中点、○ は 等しい 角、直角の 印は 垂直。印で 線の 種類を 決める',
+  eqVtx: '3つの 頂点から 等しいのは 外心（内心は 3辺から）', eqSide: '3辺から 等しいのは 内心（外心は 3つの 頂点から）', eqEdge: '正三角形 では ない（辺の 長さは ちがう）',
+  placeO: '外心：鋭角 → 内側、直角 → 斜辺の 中点、鈍角 → 外側', placeI: '内心は いつも 三角形の 内側',
+  ocNext: '隣の 角へ よみかえるのは 内心。外心は 二等辺三角形の 底角', ocOther: 'その 角が ある 二等辺三角形の もう 1つの 底角', isoT: 'その 角の 2辺を ふくむ 三角形に 注目',
+  icBase: '底角で よみかえるのは 外心。内心は 角を 2つに 分ける → 隣へ', icOther: '同じ 頂点の 隣の 角へ よみかえる',
+  icLine: '内心は 角の 二等分線の 交点 → AI は ∠A の 二等分線',
+  swapS: '順が 逆（BD : DC ＝ AB : AC。B の がわ どうし、C の がわ どうし）', midR: 'D は 中点 では ない（中点に なるのは 中線）',
+  gSwap: '頂点の ほうが 2（AG : GD ＝ 2 : 1）', gHalf: 'G は 中点 では ない。中線を 2 : 1 に 内分',
+  gPart: 'AG は 比の 2つ分、GD は 1つ分', gRatioF: '2 : 1 を そのまま 分数に しない（全体は 比の 3つ分）',
+  gHalf2: '全体の AD は 比の 3つ分（2つ分 では ない）', gWhole: 'AD は 比の 3つ分 → 1つ分は AD の {1|3}', gOther: 'AG は 比の 2つ分、GD は 1つ分',
+  gBis: '重心は 中線の 交点（角の 二等分線 では ない）', gAlt: '重心は 中線の 交点（垂線 では ない）',
+  arWhich: '頂点が 同じで 底辺が 一直線上 → 高さが 等しい。同じ 底辺 → 底辺が 等しい',
+  wholeA: '全体（△ABC）と くらべない', pairA: '△ABC は 底辺 BC 全体', otherA: '△ABD の 底辺は BD',
+  gSwapA: '高さの 比は GD : AD（中線 全体）＝ 1 : 3', gArea: 'AG : AD では なく GD : AD ＝ 1 : 3',
+};
+const MASTER_TEXT = {
+  linePt: '線の 印', propPt: '点の 特徴', lineKind: '線の 種類', eqVtx: '外心と 内心', eqSide: '外心と 内心', eqEdge: '等しい 長さ', placeO: '外心の 範囲', placeI: '内心の 範囲',
+  ocNext: '外心の 角', ocOther: '底角', isoT: '注目する 三角形', icBase: '内心の 角', icOther: '隣の 角', icLine: '内心の 線', swapS: '比の 順', midR: '二等分線の 比',
+  gSwap: '重心の 比', gHalf: '重心の 比', gPart: '比の 1つ分', gRatioF: '何分の何', gHalf2: '比の 3つ分', gWhole: '比の 1つ分', gOther: '比の 2つ分', gBis: '重心と 中点', gAlt: '重心と 中点',
+  arWhich: '高さと 底辺', wholeA: 'くらべる 三角形', pairA: 'くらべる 三角形', otherA: 'くらべる 三角形', gSwapA: '高さの 比', gArea: '高さの 比',
+};
+function describe(p, cls) { return cls.types.map(t => TYPE_TEXT[t]).join('、'); }
+function masterText(t) { return MASTER_TEXT[t]; }
+function likeOK(q, m) { return q.mode === m.mode && (m.v === undefined || q.v === m.v); }   // 苦手の 出し直しは 同じ 形・同じ 分けかた
+
+// ---------- 章・ダメージ・HP ----------
+const MID_HP = 2, FINAL_HP = NORM_CH.length;
+const zakoHP = L => 1 + Math.floor(L / 2);
+const midHP = L => 7 + Math.floor(L / 2);
+const finalHP = L => (FINAL_HP === 5 ? 18 + 4 * L : 14 + 3 * L);
+const CRIT = 1 / 8;
+const comboBonus = n => Math.min(Math.max(n - 1, 0), 3);
+function damage(p, L, ev, rng, combo = 0) {
+  const d = (p.kind === 'rev' || p.exam ? 3 : 2) + (L - 1) + (p.target && p.target.lv ? 1 : 0) + comboBonus(combo);
+  const crit = (ev && ev.mastered && ev.mastered.length > 0) || rng() < CRIT;
+  return { d: crit ? d * 2 : d, crit };
+}
+const PLAYS = 3;
+function makeSlots(ch, rng, opt = {}) {
+  const C = CHAPTERS[ch - 1], mid = [...Array(MID_HP).keys()].map(() => ({ lv: C.lv, boss: true }));
+  if (C.final) return shuffle(rng, NORM_CH.map(c => c.lv)).map(lv => ({ lv, boss: true }));
+  const play = opt.play === undefined ? ri(rng, 0, PLAYS - 1) : Math.min(opt.play, PLAYS - 1);
+  return C.plays[play].map(f => (f === 'MAB' ? { lv: C.lv, form: C.mab.form, mab: true, play } : { lv: C.lv, form: f, play })).concat(mid.map(s => Object.assign(s, { play })));
+}
+function newContext() { return { recent: [], recentTri: [], recentNum: [], weak: {}, log: [] }; }
+const shapeKey = prm => (prm.sd ? 'sd' + prm.sd.join(',') : 'an' + prm.an.join(','));
+const numKey = prm => (prm.sd ? 'n' + prm.sd[0] + ':' + prm.sd[1] : prm.L ? 'L' + prm.L : prm.bd ? 'bd' + prm.bd.join(':') : null);
+function makeProblem(slot, ctx, rng) {
+  const w = ctx.weak[slot.lv];
+  const forms = slot.form ? [slot.form] : CHAPTERS[slot.lv - 1].forms;
+  const fresh = prm => !ctx.recent.includes(JSON.stringify(prm)) && !ctx.recentTri.includes(shapeKey(prm)) && !(numKey(prm) && ctx.recentNum.includes(numKey(prm)));   // 同じ 形・同じ 数の 三角形は 続けない
+  const gen = () => genPrm(pick(rng, forms), rng);
+  let prm = null, target = false;
+  if (w) for (let i = 0; i < 400 && !prm; i++) { const c = gen(); if (likeOK(c, w.like) && fresh(c)) { prm = c; target = true; } }
+  for (let i = 0; i < 400 && !prm; i++) { const c = gen(); if (fresh(c)) prm = c; }
+  if (!prm) prm = gen();
+  const p = build(prm, rng, { boss: !!slot.boss });
+  if (slot.mab) { p.mab = true; p.label = '▼ まぼろしの 問題'; if (p.steps) p.steps[0].label = p.label; }
+  p.target = { lv: target };
+  p.key = JSON.stringify(prm);
+  ctx.recent.push(p.key); if (ctx.recent.length > 8) ctx.recent.shift();
+  ctx.recentTri = ctx.recentTri.concat([shapeKey(prm)]).slice(-2);
+  ctx.recentNum = ctx.recentNum.concat(numKey(prm) ? [numKey(prm)] : []).slice(-2);
+  return p;
+}
+function record(ctx, p, ok, cls, ms) {
+  const ev = { lv: p.lv, kind: p.kind, mode: p.mode, form: p.form, ok, types: cls ? cls.types : [], target: p.target, ms, mastered: [] };
+  const w = ctx.weak[p.lv];
+  if (ok) {
+    if (p.target.lv && w && ++w.got >= 2) { ev.mastered.push(...w.types); delete ctx.weak[p.lv]; }
+  } else {
+    const main = cls.types.slice();
+    if (main.length) ctx.weak[p.lv] = { types: main, like: p.prm, got: 0 };
+    else if (w && p.target.lv) w.got = 0;
+  }
+  ctx.log.push(ev);
+  return ev;
+}
+
+G.GaishinCore = {
+  FIG, NAMES, OTH, MED, ACUTE, NEAR, FAR, RIGHT, OBT, SD, SD_PAIRS, BD_PAIRS, T_LIST, L_DIV, L_NON, DATA_V, migrateProg, migrateZk,
+  triPts, points, circum, incen, cent, foot, meet, figure, fracStr, PTS, PT_OF, LINE_KINDS, TWO, MAB_FORMS, shapeKey, numKey,
+  CHAPTERS, NORM_CH, FORM_LV, MONSTERS, monsterOf, zukanAfter, zukanCount, GEN, genPrm, makeOptions, texts, reasonLines, build, useStep, judge, classify,
+  describe, masterText, likeOK, TYPE_TEXT, MASTER_TEXT, MID_HP, FINAL_HP, zakoHP, midHP, finalHP, CRIT, comboBonus, damage, makeSlots, PLAYS,
+  newContext, makeProblem, record, mulberry32,
+};
+})(typeof window !== 'undefined' ? window : this);
+</script>
+<!-- ========== 画面 ========== -->
+<script>
+(function () {
+'use strict';
+const C = window.GaishinCore;
+const MAX_LIVES = 3;
+const rng = Math.random;
+const $ = id => document.getElementById(id);
+const canvas = $('plane');
+const wrap = $('planeWrap');
+const gameEl = $('game');
+const monsterEl = $('monster');
+const optBtns = [...document.querySelectorAll('#controls .opt')];
+const ZK_KEY = 'gaishin-zukan', PROG_KEY = 'gaishin-progress', TUT_KEY = 'gaishin-tut';
+
+const state = {
+  ch: 1, slots: [], slotIdx: 0, hp: 1, maxHp: 1, lives: MAX_LIVES, combo: 0,
+  problem: null, opt: -1,
+  phase: 'idle',        // 'play' | 'busy' | 'next'
+  reveal: false, tut: null,
+  ctx: C.newContext(), onNext: null, bossMiss: false,
+};
+const chap = () => C.CHAPTERS[state.ch - 1];
+const nNormal = () => (chap().final ? 0 : state.nZako);
+const atBoss = () => state.slotIdx >= nNormal();
+const bossId = () => (chap().final ? 'final' : 'boss' + chap().ch);
+// 式の 文字を TeX 風の HTML に する（{分子|分母} は 横線の 分数）
+function esc(t) { return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+const FR = (a, b) => '<span class="fr"><span class="nu">' + a + '</span><span class="de">' + b + '</span></span>';
+function mathHTML(text) { return esc(text).replace(/\{([^{}|]*)\|([^{}]*)\}/g, (m, a, b) => FR(a, b)); }
+const p = () => state.problem;
+
+// ---------- 図鑑の きろく ----------
+let memZk = { _v: C.DATA_V };
+function loadZk() {
+  try {
+    const z = JSON.parse(localStorage.getItem(ZK_KEY) || 'null');
+    if (!z) return memZk;
+    if (!(z._v >= C.DATA_V)) { const m = C.migrateZk(z); saveZk(m); return m; }
+    return z;
+  } catch (e) { return memZk; }
+}
+function saveZk(z) { z = Object.assign({}, z, { _v: C.DATA_V }); memZk = z; try { localStorage.setItem(ZK_KEY, JSON.stringify(z)); } catch (e) { /* 保存できなくても その回は 遊べる */ } }
+function zkEvent(e, lines) {
+  const before = loadZk(), after = C.zukanAfter(before, e), m = C.monsterOf(e.id);
+  saveZk(after);
+  if (!before[e.id] && after[e.id]) lines.push('📖 ずかんに「' + m.name + '」が のった！' + (after[e.id] >= 2 ? '（◎）' : ''));
+  else if ((before[e.id] || 0) < 2 && after[e.id] >= 2) lines.push('📖「' + m.name + '」が ◎ に なった！');
+}
+function compText(zk) { const k = C.zukanCount(zk); return k.perfect ? '👑 かんぜん コンプ' : k.shin ? '👑 しんの コンプ' : k.comp ? '👑 ずかん コンプ！' : ''; }
+function renderTitleComp() { const t = compText(loadZk()); $('compTitle').textContent = t; $('compTitle').classList.toggle('hidden', !t); }
+
+// ---------- 表示 ----------
+function renderStatus() {
+  const c = chap(), n = nNormal(), L = heroLV();
+  $('levelDisplay').textContent = 'LV ' + L;
+  $('attackDisplay').textContent = String(attack(L));
+  $('livesDisplay').innerHTML = '♥'.repeat(Math.max(0, state.lives)) + '<span class="empty">' + '♡'.repeat(MAX_LIVES - Math.max(0, state.lives)) + '</span>';
+  $('enemyHpDisplay').textContent = 'HP ' + Math.max(0, state.hp) + '/' + state.maxHp;
+  const done = Math.min(state.slotIdx, n);
+  $('progressDisplay').textContent = (c.final ? (atBoss() ? '' : 'さいごの 章　') : '第' + c.ch + '章　') +
+    (atBoss() ? c.boss.name + ' と たたかい中！' : '■'.repeat(done) + '□'.repeat(n - done) + ' ボスまで あと ' + (n - done) + 'たい');
+  if (state.tut) {
+    $('levelDisplay').textContent = 'れんしゅう';
+    $('progressDisplay').textContent = 'れんしゅう ' + (state.tut.i + 1) + '/' + TUT.length;
+  }
+}
+function appear() {
+  if (p() && p().mab && !state.tut) { mabWarn(); return 'まぼろしの ' + enemyNow().name + 'が あらわれた！'; }
+  return enemyNow().name + 'が　あらわれた！';
+}
+function warnTop(el) { const g = gameEl.getBoundingClientRect(), m = $('message').getBoundingClientRect(); el.style.top = Math.max(0, m.top - g.top) + 'px'; }
+function mabWarn() {
+  const el = document.createElement('div'); el.className = 'boss-warn mab'; el.textContent = '✨ まぼろし ✨';
+  warnTop(el); gameEl.appendChild(el); setTimeout(() => el.remove(), 2000); flashScreen(); setTimeout(flashScreen, 200);
+}
+function enemyNow() { const c = chap(); return atBoss() ? c.boss : C.monsterOf(p() ? p().form : c.forms[0]); }
+function renderEnemy() {
+  const c = chap(), boss = atBoss() && !state.tut, e = state.tut ? { name: 'まと', sprite: '🎯' } : enemyNow();
+  monsterEl.textContent = e.sprite;
+  monsterEl.className = boss ? 'boss' : p() && p().mab && !state.tut ? 'mab' : '';
+  $('monsterName').textContent = e.name;
+  gameEl.classList.toggle('boss-mid', boss && !c.final);
+  gameEl.classList.toggle('boss-final', boss && !!c.final);
+}
+function bossWarn(final) {
+  const el = document.createElement('div');
+  el.className = 'boss-warn' + (final ? ' final' : '');
+  el.textContent = final ? '⚠ BOSS ⚠' : '⚠ 中ボス ⚠';
+  warnTop(el); gameEl.appendChild(el); setTimeout(() => el.remove(), 2000);
+}
+const PUNC = t => t.replace(/。/g, '．').replace(/、/g, '，');   // 問題文は 教科書と おなじ「，」「．」
+function examLines(t) {   // 問題集の ことばは「条件」と「どうするか」の あいだで 改行
+  let i = -1;
+  for (const m of t.matchAll(/(?:に ついて|と する|を とる)[、。]/g)) i = m.index + m[0].length;
+  if (i < 0) { const j = t.slice(0, -1).lastIndexOf('。'); if (j >= 0) i = j + 1; }
+  return i > 0 && i < t.length ? [t.slice(0, i), t.slice(i)] : [t];
+}
+const NBOP = t => t.replace(/ ([＝＋−:]) /g, ' $1 ');
+function renderProblem() {
+  const q = p(), el = $('problemExpr');
+  $('problemLabel').textContent = q.label;
+  const wrapIt = q.exam || q.long;
+  if (wrapIt) el.innerHTML = (q.exam ? examLines(q.display) : q.display.split(/(?<=。)/).filter(x => x)).map(x => mathHTML(NBOP(PUNC(x)))).join('<br>');
+  else el.innerHTML = q.display.split(/(?<=。)/).filter(x => x).map(x => '<span class="nw">' + mathHTML(NBOP(PUNC(x))) + '</span>').join('<br>');
+  el.classList.toggle('exam', !!wrapIt);
+  el.classList.toggle('long', !wrapIt && q.display.length > 18);
+  fitProblem();
+}
+function fitProblem() {
+  const el = $('problemExpr');
+  el.querySelectorAll('.nw').forEach(nw => {
+    nw.style.fontSize = ''; nw.style.whiteSpace = '';
+    let size = parseFloat(getComputedStyle(nw).fontSize);
+    while (nw.scrollWidth > el.clientWidth && size > 10) { size -= 1; nw.style.fontSize = size + 'px'; }
+    if (nw.scrollWidth > el.clientWidth) nw.style.whiteSpace = 'normal';
+  });
+}
+function show(el, on) { el.classList.toggle('hidden', !on); }
+function renderMapBtn() { $('mapBtn').classList.toggle('hidden', !!state.tut || !(state.phase === 'play' || state.phase === 'next')); }
+function renderControls() {
+  renderMapBtn();
+  const q = p(), next = state.phase === 'next', hasOpt = !!q && !!q.options, n = hasOpt ? q.options.length : 0;
+  $('controls').classList.toggle('three', n === 3);
+  optBtns.forEach((b, i) => {
+    show(b, hasOpt && i < n);
+    if (!hasOpt || i >= n) return;
+    const t = q.options[i].text;
+    b.innerHTML = t.split('、').map(x => '<span class="nw">' + mathHTML(x) + '</span>').join('、');
+    b.dataset.text = t;
+    b.classList.toggle('on', state.opt === i && !state.reveal);
+    b.classList.toggle('right', state.reveal && q.options[i].correct);
+    b.classList.toggle('wrong', state.reveal && state.opt === i && !q.options[i].correct);
+  });
+  show($('decideBtn'), !next);
+  show($('nextBtn'), next);
+  $('decideBtn').disabled = !ready();
+  fitOpts();
+}
+// 選択肢の 文字が ボタンに 入りきらない ときは、文字を 小さく（13px まで）→ それでも 入らなければ 1列に して もう一度
+function fitOpts() {
+  const c = $('controls'), vis = optBtns.filter(b => !b.classList.contains('hidden'));
+  c.classList.remove('one'); optBtns.forEach(b => { b.style.fontSize = ''; });
+  if (!vis.length) return;
+  const over = () => vis.some(b => b.scrollWidth > b.clientWidth + 1);
+  const shrink = min => { let f = parseFloat(getComputedStyle(vis[0]).fontSize); while (over() && f > min) { f -= 1; vis.forEach(b => { b.style.fontSize = f + 'px'; }); } };
+  shrink(14);
+  if (over()) { vis.forEach(b => { b.style.fontSize = ''; }); c.classList.add('one'); shrink(8); }
+  if (over()) vis.forEach(b => b.querySelectorAll('.nw').forEach(nw => { nw.style.whiteSpace = 'normal'; }));
+}
+window.__fitOpts = fitOpts;
+function ready() { const q = p(); return !!q && state.phase === 'play' && state.opt >= 0; }
+function setMessage(text) { $('msgText').innerHTML = mathHTML(text); $('message').scrollTop = 0; }
+
+// ---------- 図を 描く（三角形。中身は しくみの figure）----------
+let DPR = 1;
+function resizePlane() {
+  fitOpts();
+  const w = Math.floor(Math.min(wrap.clientWidth - 12, (wrap.clientHeight - 8) / C.FIG.ASPECT));
+  const W = Math.max(100, w), H = Math.round(W * C.FIG.ASPECT);
+  DPR = Math.min(window.devicePixelRatio || 1, 3);
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
+  draw();
+  placeBtnHint();
+  if (p()) fitProblem();
+}
+const COLS = { w: '#fff', cy: '#7fe8ff', sub: 'rgba(255,255,255,0.6)', mk: '#ff9f43', pt: '#ffd84a', ok: '#4dff88', or: '#ff9f43', bl: '#6f9dff',
+  sh1: 'rgba(255,159,67,0.26)', sh2: 'rgba(111,157,255,0.30)', shg: 'rgba(77,255,136,0.22)' };
+const ORDER = ['poly', 'circ', 'seg', 'tick', 'right', 'ang', 'dot', 'num', 'lab'];
+function textAt(ctx, d, s, x, y, col, size, bold = true) {
+  ctx.font = (bold ? 'bold ' : '') + (size * d) + 'px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = 4 * d; ctx.strokeStyle = '#000a18'; ctx.lineJoin = 'round'; ctx.strokeText(s, x, y);
+  ctx.fillStyle = col; ctx.fillText(s, x, y);
+}
+const same = (a, b) => Math.abs(a[0] - b[0]) < 1e-7 && Math.abs(a[1] - b[1]) < 1e-7;
+function onSeg(p_, a, b) { const ab = [b[0] - a[0], b[1] - a[1]], l2 = ab[0] * ab[0] + ab[1] * ab[1], t = ((p_[0] - a[0]) * ab[0] + (p_[1] - a[1]) * ab[1]) / l2; if (t <= 1e-6 || t >= 1 - 1e-6) return false; return Math.hypot(a[0] + ab[0] * t - p_[0], a[1] + ab[1] * t - p_[1]) < 1e-7; }
+// 図を 描く：たても 横も 同じ 縮尺。三角形の まんなかを 図の まんなかに、答えの あとに 出る 点（外側の 外心など）も 入る 大きさ
+function drawSpec(ctx, W, H, d, spec, showAns, small) {
+  ctx.fillStyle = '#000a18'; ctx.fillRect(0, 0, W, H);
+  const items = spec.ask.filter(it => !(showAns && it.hide)).concat(showAns ? spec.ans : []);
+  const xs = spec.tri.map(t => t[0]), ys = spec.tri.map(t => t[1]), cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  let hw = 1e-6, hh = 1e-6;
+  const inc = q => { hw = Math.max(hw, Math.abs(q[0] - cx)); hh = Math.max(hh, Math.abs(q[1] - cy)); };
+  spec.ask.concat(spec.ans).forEach(it => { if (it.k === 'right' || it.k === 'ang') return; ['a', 'b', 'p', 'o'].forEach(k => { if (it[k]) inc(it[k]); }); if (it.ps) it.ps.forEach(inc); });   // 直角・角の 印の 向きの 点は 入れない
+  const mx = (small ? 14 : 28) * d, my = (small ? 13 : 24) * d;
+  const s = Math.min((W - 2 * mx) / (2 * hw), (H - 2 * my) / (2 * hh));
+  const X = q => [W / 2 + (q[0] - cx) * s, H / 2 - (q[1] - cy) * s];
+  if (!small) {   // テスト用：縮尺（たて ＝ 横）と 図の 点の 範囲
+    const pts = []; spec.ask.concat(spec.ans).forEach(it => { if (it.k === 'right' || it.k === 'ang') return; ['a', 'b', 'p', 'o'].forEach(k => { if (it[k]) pts.push(X(it[k])); }); if (it.ps) it.ps.forEach(q => pts.push(X(q))); });
+    window.__figScale = [s, s]; window.__figBox = { W, H, x0: Math.min(...pts.map(q => q[0])), x1: Math.max(...pts.map(q => q[0])), y0: Math.min(...pts.map(q => q[1])), y1: Math.max(...pts.map(q => q[1])) };
+  }
+  const fs = small ? 0.75 : 1;
+  const tri = spec.tri.map(X), tc = [(tri[0][0] + tri[1][0] + tri[2][0]) / 3, (tri[0][1] + tri[1][1] + tri[2][1]) / 3];
+  const line = (a, b, col, w, dash) => { ctx.strokeStyle = col; ctx.lineWidth = w * d * fs; ctx.setLineDash(dash ? [5 * d, 4 * d] : []); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.setLineDash([]); };
+  ctx.lineCap = 'round';
+  ORDER.forEach(kind => items.filter(it => it.k === kind).forEach(it => {
+    const col = COLS[it.c] || it.c;
+    if (kind === 'poly') { ctx.fillStyle = col; ctx.beginPath(); it.ps.map(X).forEach((q, i) => (i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]))); ctx.closePath(); ctx.fill(); }
+    if (kind === 'circ') { const o = X(it.o); ctx.strokeStyle = col; ctx.lineWidth = 1.8 * d * fs; ctx.setLineDash(it.d ? [6 * d, 4 * d] : []); ctx.beginPath(); ctx.arc(o[0], o[1], it.r * s, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+    if (kind === 'seg') line(X(it.a), X(it.b), col, it.w, it.d);
+    if (kind === 'tick') {
+      const a = X(it.a), b = X(it.b), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, u = [(b[0] - a[0]) / l, (b[1] - a[1]) / l], nv = [-u[1], u[0]];
+      const dir = [u[0] * 0.5 + nv[0] * 0.866, u[1] * 0.5 + nv[1] * 0.866], L = 6 * d * fs;
+      for (let i = 0; i < it.n; i++) { const o = (i - (it.n - 1) / 2) * 4.5 * d * fs, c0 = [m[0] + u[0] * o, m[1] + u[1] * o]; line([c0[0] - dir[0] * L, c0[1] - dir[1] * L], [c0[0] + dir[0] * L, c0[1] + dir[1] * L], col, 1.8, false); }
+    }
+    if (kind === 'right') {
+      const v = X(it.v), un = q => { const w = X(q), l = Math.hypot(w[0] - v[0], w[1] - v[1]) || 1; return [(w[0] - v[0]) / l * 9 * d * fs, (w[1] - v[1]) / l * 9 * d * fs]; }, a = un(it.a), b = un(it.b);
+      ctx.strokeStyle = col; ctx.lineWidth = 1.5 * d; ctx.beginPath(); ctx.moveTo(v[0] + a[0], v[1] + a[1]); ctx.lineTo(v[0] + a[0] + b[0], v[1] + a[1] + b[1]); ctx.lineTo(v[0] + b[0], v[1] + b[1]); ctx.stroke();
+    }
+    if (kind === 'ang') {
+      const v = X(it.v), a = X(it.a), b = X(it.b), a1 = Math.atan2(a[1] - v[1], a[0] - v[0]), a2 = Math.atan2(b[1] - v[1], b[0] - v[0]);
+      let dd = a2 - a1; while (dd > Math.PI) dd -= 2 * Math.PI; while (dd <= -Math.PI) dd += 2 * Math.PI;
+      const r = it.r * d * fs;
+      ctx.strokeStyle = col; ctx.lineWidth = 1.6 * d; ctx.beginPath(); ctx.arc(v[0], v[1], r, a1, a1 + dd, dd < 0); ctx.stroke();
+      if (it.s) { const am = a1 + dd / 2, rr = Math.min(64 * d * fs, Math.max(r + 9 * d * fs, 7.5 * d * fs / Math.max(0.05, Math.sin(Math.abs(dd) / 2))));   /* 角が 小さい ときは 印を 外へ（となりの 印と 重ならない） */ textAt(ctx, d, it.s, v[0] + Math.cos(am) * rr, v[1] + Math.sin(am) * rr, col, (it.s === '?' ? 13 : 11) * fs); }
+    }
+    if (kind === 'dot') { const q = X(it.p); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(q[0], q[1], it.r * d * fs, 0, Math.PI * 2); ctx.fill(); }
+    if (kind === 'num') {
+      const a = X(it.a), b = X(it.b), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      let nv = [-(b[1] - a[1]) / l, (b[0] - a[0]) / l];
+      const aw = it.away ? X(it.away) : tc;
+      if ((m[0] - aw[0]) * nv[0] + (m[1] - aw[1]) * nv[1] < 0) nv = [-nv[0], -nv[1]];
+      textAt(ctx, d, it.s, m[0] + nv[0] * 13 * d * fs, m[1] + nv[1] * 13 * d * fs, col, 14 * fs);
+    }
+    if (kind === 'lab') {   // 文字は 線が ない いちばん 広い すきまの 向きに
+      const dirs = [];
+      items.filter(o => o.k === 'seg').forEach(o => {
+        if (same(o.a, it.p)) dirs.push(o.b); else if (same(o.b, it.p)) dirs.push(o.a); else if (onSeg(it.p, o.a, o.b)) { dirs.push(o.a); dirs.push(o.b); }
+      });
+      const q = X(it.p);
+      let ang = Math.atan2(q[1] - tc[1], q[0] - tc[0]);
+      if (dirs.length) {
+        const as = dirs.map(w => { const t = X(w); return Math.atan2(t[1] - q[1], t[0] - q[0]); }).sort((x, y) => x - y);
+        const out = ang;   // すきまが 同じ くらいなら 三角形の 外がわへ
+        let best = -1;
+        as.forEach((x, i) => { const y = i + 1 < as.length ? as[i + 1] : as[0] + 2 * Math.PI, g = y - x, mdl = x + g / 2, sc = g * (1 + 0.25 * Math.cos(mdl - out)); if (sc > best) { best = sc; ang = mdl; } });
+      }
+      const rr = (small ? 10 : 14) * d;
+      textAt(ctx, d, it.s, q[0] + Math.cos(ang) * rr, q[1] + Math.sin(ang) * rr, col, (small ? 11 : 15));
+    }
+  }));
+  ctx.lineCap = 'butt';
+}
+function draw() {
+  const ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
+  ctx.fillStyle = '#000a18'; ctx.fillRect(0, 0, W, H);
+  const q = p();
+  if (!q) return;
+  drawSpec(ctx, W, H, DPR, q.fig, state.reveal, false);
+}
+// 約束の 画面の 小さい 図
+function drawDefFigs() {
+  const an = [60, 70, 50];
+  [['defO', 'perp'], ['defI', 'bis'], ['defG', 'med']].forEach(([id, v]) => {
+    const cv = $(id), d = 2; cv.width = 240; cv.height = 200;
+    const sp = C.figure({ mode: 'whichPt', v, an });
+    sp.ask.forEach(it => { if (it.k === 'lab' && it.s === 'P') it.s = { perp: 'O', bis: 'I', med: 'G' }[v]; });
+    drawSpec(cv.getContext('2d'), cv.width, cv.height, d, sp, true, true);
+  });
+}
+
+// ---------- 演出 ----------
+function flashScreen() { const f = $('flash'); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); }
+function monsterAnim(cls) { monsterEl.classList.remove('hit', 'miss-dmg'); void monsterEl.offsetWidth; monsterEl.classList.add(cls); }
+function showDamage(text, color) {
+  const el = document.createElement('div');
+  el.className = 'dmg-float'; el.textContent = text; el.style.color = color;
+  el.style.textShadow = '2px 2px 0 #000, 0 0 8px ' + color;
+  const r = monsterEl.getBoundingClientRect(), g = gameEl.getBoundingClientRect();
+  el.style.left = (r.left - g.left + r.width / 2 - 16) + 'px'; el.style.top = (r.top - g.top) + 'px';
+  gameEl.appendChild(el); setTimeout(() => el.remove(), 1000);
+}
+const HOME = ['すごい！', 'その とおり！', 'ナイス！', 'さすが！', 'みきわめた！', 'かんぺき！', 'いいね！'];
+function showMaru(text, gold) {
+  const el = document.createElement('div'); el.className = 'maru' + (gold ? ' gold' : '');
+  const s = document.createElement('span'); s.textContent = text || HOME[Math.floor(Math.random() * HOME.length)]; el.appendChild(s);
+  gameEl.appendChild(el); setTimeout(() => el.remove(), 1150);
+}
+function showLevelUp() { const el = document.createElement('div'); el.className = 'level-up'; el.textContent = 'LEVEL UP!'; gameEl.appendChild(el); setTimeout(() => el.remove(), 1800); }
+
+// ---------- 進行 ----------
+function hint() { return 'えらんで けってい'; }
+function resetInput() { state.opt = -1; state.reveal = false; }
+function newProblem() {
+  if (state.slotIdx >= state.slots.length) {   // ボスは HP が のこる かぎり 出す
+    const c = chap(), lv = c.final ? 1 + Math.floor(rng() * C.FINAL_HP) : c.lv;
+    state.slots.push({ lv, boss: true });
+  }
+  state.problem = C.makeProblem(state.slots[state.slotIdx], state.ctx, rng);
+  resetInput(); state.stepFail = null;
+  state.phase = 'play';
+  state.shownAt = performance.now();
+  renderEnemy(); renderProblem(); renderControls(); renderStatus(); draw();
+}
+function submit() {
+  const q = p();
+  if (state.phase !== 'play' || !q) return;
+  if (state.tut) { tutDecide(); return; }
+  if (!ready()) { setMessage(hint()); return; }
+  const ans = { opt: state.opt }, ok = C.judge(q, ans), cls = ok ? null : C.classify(q, ans);
+  if (q.steps && q.stepIdx === 0) { stepOne(ok, cls); return; }   // 連れ問の ①
+  if (q.steps && state.stepFail) { afterStepFail(ok); return; }   // ① を まちがえた あとの ②
+  const ev = C.record(state.ctx, q, ok, cls, Math.round(performance.now() - state.shownAt));
+  if (ok) onCorrect(ev); else onWrong(cls);
+}
+// 連れ問：① が せいかいなら そのまま ② へ（② でも 問題文は のこす）。① を まちがえたら ライフを 1つ へらし、ただしい ① を 見せて ② へ
+function goStep2(msg) {
+  C.useStep(p(), 1); resetInput();
+  state.phase = 'play'; renderProblem(); renderControls(); draw(); setMessage(msg + '\n' + hint());
+}
+function stepOne(ok, cls) {
+  const q = p();
+  state.reveal = true;
+  if (ok) {
+    state.phase = 'busy'; draw(); renderControls(); flashScreen(); showMaru('① せいかい！');
+    setMessage('① せいかい！　' + q.reason[0] + '\nつぎは ②');
+    setTimeout(() => goStep2('① せいかい！　つぎは ②'), 900);
+    return;
+  }
+  state.stepFail = cls; state.combo = 0;
+  if (atBoss()) state.bossMiss = true;
+  if (q.mab) state.mabMiss = true;
+  state.lives -= 1; state.phase = 'next';
+  draw(); renderControls(); renderStatus();
+  monsterAnim('miss-dmg'); showDamage('MISS', '#ff4444');
+  setMessage(['ざんねん！　' + C.describe(q, cls), 'ただしい 印は みどり', ...q.reason].join('\n'));
+  state.onNext = state.lives <= 0 ? () => { state.phase = 'idle'; $('gameOverScreen').classList.remove('hidden'); } : () => goStep2('② は ただしい ① で 考えよう');
+}
+function afterStepFail(ok) {   // ① を まちがえた 問題は ② が できても たおせない（もう一度）
+  const q = p(), cls = ok ? state.stepFail : C.classify(q, { opt: state.opt });
+  C.record(state.ctx, q, false, state.stepFail, Math.round(performance.now() - state.shownAt));
+  state.phase = 'next'; state.reveal = true;
+  draw(); renderControls(); renderStatus();
+  setMessage((ok ? ['② は せいかい！', ...q.reason, 'でも ① を まちがえたので、もう一度'] : ['ざんねん！　' + C.describe(q, cls), ...q.reason]).join('\n'));
+  state.onNext = () => { newProblem(); setMessage('もういちど！\n' + hint()); };
+}
+// せいかい：みどりの 印と 理由を 見せて「つぎへ」で すすむ（まったり）
+function onCorrect(ev) {
+  const c = chap(), boss = atBoss(), e = enemyNow(), q = p();
+  state.combo = (state.combo || 0) + 1;
+  const hit = C.damage(q, heroLV(), ev, rng, state.combo);
+  state.reveal = true; state.hp -= hit.d;
+  let hold = false, stay = false;
+  if (c.final && !loadProg().done && state.hp <= 0 && state.slotIdx < C.FINAL_HP - 1) { state.hp = 1; hold = true; }   // さいごの 章は 1周目だけ、すべての 章を 出しきるまで たおれない
+  if (!boss && q.target && q.target.lv && state.ctx.weak[q.lv]) { state.hp = Math.max(state.hp, 1); stay = true; }   // ザコは 苦手を こくふく するまで たおれない
+  flashScreen(); if (hit.crit) setTimeout(flashScreen, 180);
+  monsterAnim('hit'); showDamage('-' + hit.d, hit.crit ? '#ff9900' : '#ffff00');
+  showMaru(hit.crit ? 'かいしん！' : (state.combo || 0) >= 3 ? state.combo + ' れんぞく！' : '', hit.crit);
+  const lines = ['せいかい！　' + e.name + 'に　' + hit.d + ' の ダメージ！'];
+  if (hit.crit) lines.unshift('かいしんの いちげき！');
+  lines.push(...q.reason.filter(r => !r.startsWith('この 問題は')));
+  if (q.target && q.target.lv) lines.push('（にがての もんだいに せいかい ＋1）');
+  if (C.comboBonus(state.combo) > 0) lines.push('れんぞく せいかい ×' + state.combo + '（＋' + C.comboBonus(state.combo) + '）');
+  ev.mastered.forEach(t => lines.push('◎ ' + C.masterText(t) + ' こくふく！'));
+  if (ev.mastered.length) zkEvent({ type: 'master', id: q.form }, lines);
+  if (hold) lines.push(e.name + '「まだ たおれぬ！」');
+  if (stay) lines.push(e.name + '「にがてを こくふく するまで たおれぬ！」');
+  if (state.hp <= 0) zkEvent(boss ? { type: 'boss', id: bossId(), noMiss: !state.bossMiss } : q.mab ? { type: 'boss', id: q.form, noMiss: !state.mabMiss } : { type: 'kill', id: q.form }, lines);
+  state.phase = 'next';
+  draw(); renderControls(); renderStatus();
+  setMessage(lines.join('\n'));
+  state.onNext = () => {
+    if (!stay) state.slotIdx += 1;
+    if (state.hp > 0) { newProblem(); setMessage((stay ? 'もう 1もん！' : 'のこり HP ' + state.hp + '！') + '\n' + hint()); return; }
+    state.phase = 'busy'; renderControls();
+    monsterEl.classList.add('dying');
+    setMessage(e.name + 'を　たおした！');
+    renderStatus();
+    setTimeout(afterDefeat, 1100);
+  };
+}
+function afterDefeat() {
+  const c = chap(), L = heroLV();
+  monsterEl.classList.remove('dying');
+  if (c.final || state.slotIdx > nNormal()) { chapterClear(); return; }
+  state.lives = MAX_LIVES;
+  if (state.slotIdx === nNormal()) {   // 中ボス
+    state.hp = state.maxHp = C.midHP(L); state.bossMiss = false;
+    newProblem(); bossWarn(false);
+    setMessage('中ボス ' + c.boss.name + 'が あらわれた！\nここからは 問題集の ことばで 出るぞ！\n' + hint());
+    return;
+  }
+  state.hp = state.maxHp = C.zakoHP(L);
+  newProblem();
+  setMessage(appear() + '\n' + hint());
+}
+// ---------- ★の きろく（1つの 章を 続けて あそんで ★3。ぜんぶの 章が ★3 で さいごの 章が ひらく）----------
+const MAX_STAR = 3;
+const NORM = C.NORM_CH.map(c => c.ch);
+let memProg = null;
+function newProg() { return { stars: {}, gained: 0, done: false, v: C.DATA_V }; }
+function loadProg() {
+  try {
+    const raw = localStorage.getItem(PROG_KEY);
+    if (raw) { const pr = JSON.parse(raw); if (!(pr.v >= C.DATA_V)) { const m = C.migrateProg(pr); saveProg(m); return m; } return pr; }
+  } catch (e) { /* 読めなければ メモリの きろく */ }
+  return memProg || newProg();
+}
+function saveProg(pr) { pr.v = C.DATA_V; memProg = pr; try { localStorage.setItem(PROG_KEY, JSON.stringify(pr)); } catch (e) { /* 保存できなくても その回は 遊べる */ } }
+const heroLV = () => 1 + loadProg().gained;
+const attack = L => L + 1;
+const starsOf = (pr, ch) => Math.min(MAX_STAR, pr.stars[ch] || 0);
+const allStar = pr => NORM.every(k => starsOf(pr, k) >= MAX_STAR);
+const starTotal = pr => NORM.reduce((s, k) => s + starsOf(pr, k), 0);
+function starStr(n) { n = Math.min(n, MAX_STAR); return '<span class="stars">' + '★'.repeat(n) + '<span class="dim">' + '☆'.repeat(MAX_STAR - n) + '</span></span>'; }
+function showMap() {
+  const pr = loadProg(), L = heroLV(), zk = loadZk(), k = C.zukanCount(zk);
+  const items = C.CHAPTERS.map(c => {
+    if (c.final) {
+      if (!allStar(pr)) return '<button class="chap locked" disabled>🔒 さいごの 章<span class="unit">ぜんぶの 章を ★3 に すると ひらく（★ ' + starTotal(pr) + '/' + NORM.length * MAX_STAR + '）</span></button>';
+      return '<button class="chap" data-ch="' + c.ch + '">' + (pr.done ? '👑 ' : '▶ ') + c.title + '<span class="unit">ボス ' + c.boss.name + '（問題集の ことばで ' + C.FINAL_HP + 'つの 章）</span></button>';
+    }
+    const n = starsOf(pr, c.ch);
+    return '<button class="chap" data-ch="' + c.ch + '">' + (n >= MAX_STAR ? '✅ ' : '▶ ') + c.title + starStr(n) + '<span class="unit">ザコ 2体 → 中ボス ' + c.boss.name + '</span></button>';
+  }).join('') + (pr.done ? '<button class="chap reset" id="resetBtn2">🔄 さいしょから あそぶ</button>' : '');
+  $('mapLV').textContent = 'ゆうしゃ LV ' + L + '　こうげき力 ' + attack(L) + '　★ ' + starTotal(pr) + '/' + NORM.length * MAX_STAR;
+  $('zukanBtn').textContent = '📖 モンスターずかん ' + k.got + '/' + k.all;
+  $('mapComp').textContent = compText(zk); $('mapComp').classList.toggle('hidden', !compText(zk));
+  $('chapterList').innerHTML = items;
+  $('chapterList').querySelectorAll('.chap[data-ch]').forEach(b => b.addEventListener('click', () => { $('mapScreen').classList.add('hidden'); state.ctx = C.newContext(); startChapter(+b.dataset.ch); }));
+  if (pr.done) $('resetBtn2').addEventListener('click', () => $('resetScreen').classList.remove('hidden'));
+  $('mapScreen').classList.remove('hidden');
+  state.phase = 'idle';
+}
+function openDef(btn) { $('defClose').textContent = btn; $('defScreen').classList.remove('hidden'); $('defScreen').scrollTop = 0; drawDefFigs(); }
+function startChapter(ch) {
+  state.ch = ch;
+  const c = chap(), pr0 = loadProg(), n = starsOf(pr0, ch);
+  state.slots = C.makeSlots(ch, rng, { play: n < MAX_STAR ? n : undefined });   // ★0 → 1回め、★1 → 2回め、★2 → 3回め（まぼろし）。★3 の あとは どれか
+  state.nZako = state.slots.filter(s => !s.boss).length; state.mabMiss = false;
+  state.slotIdx = 0; state.combo = 0; state.bossMiss = false;
+  state.hp = state.maxHp = c.final ? C.finalHP(heroLV()) : C.zakoHP(heroLV());
+  state.lives = MAX_LIVES;
+  monsterEl.classList.remove('dying');
+  newProblem();
+  if (c.final) bossWarn(true);
+  if (c.intro && n === 0 && starTotal(pr0) === 0) openDef('▶ たたかう');   // はじめて の とき だけ 約束の 画面
+  setMessage((c.final ? c.boss.name + 'が あらわれた！\nここからは 問題集の ことばで 出るぞ！' : c.title + '\n' + appear()) + '\n' + hint());
+}
+function showZukan() {
+  const zk = loadZk(), k = C.zukanCount(zk);
+  let html = '', last = 0;
+  C.MONSTERS.slice().sort((a, b) => a.ch - b.ch || (a.boss ? 2 : a.mab ? 1 : 0) - (b.boss ? 2 : b.mab ? 1 : 0)).forEach(m => {
+    if (m.ch !== last) { html += '<div class="zch">' + C.CHAPTERS[m.ch - 1].title + '</div>'; last = m.ch; }
+    const v = zk[m.id] || 0, mz = m.mab ? ' mabz' : '';
+    if (!v) { html += '<div class="zi lock' + mz + '" data-id="' + m.id + '"><span class="mk">・</span><span class="sp">？</span><span class="nm">？？？' + (m.mab ? '（★3 の 回に あらわれる）' : '') + '</span><span class="tip">' + (m.mab ? 'まぼろしの モンスター' : m.boss ? 'まだ たおして いない ボス' : 'まだ たおして いない') + '</span></div>'; return; }
+    html += '<div class="zi ' + (v >= 2 ? 'master' : 'got') + mz + '" data-id="' + m.id + '"><span class="mk">' + (v >= 2 ? '◎' : '○') + '</span><span class="sp">' + m.sprite + '</span><span class="nm">' + (m.mab ? 'まぼろしの ' : '') + m.name + (m.boss ? '（ボス）' : '') + '</span><span class="tip">' + mathHTML(m.tip) + '</span></div>';
+  });
+  $('zukanList').innerHTML = html;
+  $('zukanCount').textContent = 'たおした ' + k.got + '/' + k.all + '　◎ ' + k.mas + '/' + k.all + '　まぼろし ' + k.mabGot + '/' + k.mabAll;
+  $('zukanComp').textContent = compText(zk); $('zukanComp').classList.toggle('hidden', !compText(zk));
+  $('mapScreen').classList.add('hidden'); $('zukanScreen').classList.remove('hidden'); $('zukanScreen').scrollTop = 0;
+}
+function chapterClear() {
+  gameEl.classList.remove('boss-mid', 'boss-final');
+  const c = chap(), pr = loadProg(), before = heroLV();
+  state.phase = 'idle';
+  const lines = [];
+  if (!c.final) {
+    const was = allStar(pr), n0 = starsOf(pr, c.ch);
+    if (n0 < MAX_STAR) {
+      pr.stars[c.ch] = n0 + 1; pr.gained += 1;
+      lines.push('★ ' + (n0 + 1) + '/' + MAX_STAR + ' ゲット！');
+      lines.push('LEVEL UP！　LV ' + before + ' → ' + (before + 1) + '　こうげき力 ' + attack(before) + ' → ' + attack(before + 1));
+      showLevelUp();
+    } else lines.push('（この 章は もう ★3。ほかの 章で ★を あつめよう）');
+    if (!was && allStar(pr)) lines.push('ぜんぶの 章が ★3！　さいごの 章が ひらいた！');
+    else if (!allStar(pr)) lines.push('★ ぜんぶで ' + starTotal(pr) + '/' + NORM.length * MAX_STAR);
+  } else {
+    pr.done = true;
+    lines.push('GAME CLEAR!　三つの 心を みきわめし者よ、その ちえに えいこう あれ。');
+  }
+  const k = C.zukanCount(loadZk());
+  lines.push('📖 ずかん ' + k.got + '/' + k.all + (compText(loadZk()) ? '　' + compText(loadZk()) : ''));
+  saveProg(pr);
+  $('clearHero').textContent = c.boss.sprite;
+  $('clearTitle').textContent = c.boss.name + 'を たおした！';
+  $('clearText').textContent = lines.join('\n');
+  $('resetBtn1').classList.toggle('hidden', !c.final);
+  $('againBtn').classList.toggle('hidden', !!c.final);
+  $('againBtn').textContent = starsOf(pr, c.ch) < MAX_STAR ? '🔁 もう一回（★' + (starsOf(pr, c.ch) + 1) + ' へ）' : '🔁 もう一回';
+  $('clearScreen').classList.remove('hidden');
+}
+function resetAll() {
+  memProg = newProg(); memZk = { _v: C.DATA_V };
+  try { [PROG_KEY, ZK_KEY, TUT_KEY].forEach(k => localStorage.removeItem(k)); } catch (e) { /* 消せなくても その回は 最初から */ }
+  ['resetScreen', 'clearScreen', 'mapScreen'].forEach(id => $(id).classList.add('hidden'));
+  state.ctx = C.newContext(); state.phase = 'idle';
+  renderTitleComp();
+  $('titleScreen').classList.remove('hidden');
+}
+function onWrong(cls) {
+  const q = p();
+  state.combo = 0;
+  if (atBoss()) state.bossMiss = true;
+  if (q.mab) state.mabMiss = true;
+  state.lives -= 1; state.phase = 'next'; state.reveal = true;
+  draw(); renderControls(); renderStatus();
+  monsterAnim('miss-dmg'); showDamage('MISS', '#ff4444');
+  setMessage(['ざんねん！　' + C.describe(q, cls), 'ただしい 印は みどり', ...q.reason].join('\n'));
+  state.onNext = state.lives <= 0
+    ? () => { state.phase = 'idle'; $('gameOverScreen').classList.remove('hidden'); }
+    : () => { newProblem(); setMessage((p().target.lv ? 'にた もんだいで たしかめよう！' : 'もういちど！') + '\n' + hint()); };
+}
+function next() { if (state.phase !== 'next' || !state.onNext) return; const cb = state.onNext; state.onNext = null; cb(); }
+
+// ---------- チュートリアル（まちがえられない）----------
+const TUT = [
+  { prm: { mode: 'whichPt', f: 'whichPt', v: 'perp', an: [60, 70, 50] },
+    msg: '【れんしゅう 1/3】辺の 中点（／）で 直角に 交わる 線は 垂直二等分線。3本の 交点は 外心。光って いる「外心」を おそう',
+    wrongOpt: '／ と 直角の 印 → 垂直二等分線 → 外心。光って いる ボタンを おしてね' },
+  { prm: { mode: 'icAngle', f: 'icAngle', an: [70, 60, 50], x: ['B', 'C'] },
+    msg: '【れんしゅう 2/3】内心は 角の 二等分線の 交点。BI は ∠B を 2つに 分ける → ∠IBC ＝ ∠IBA（角度を 隣へ よみかえる）',
+    wrongOpt: '∠B を 2つに 分けた 隣の 角だよ。光って いる ボタンを おしてね' },
+  { prm: { mode: 'gRatio', f: 'gRatio', an: [50, 60, 70], x: ['A', 'B'], ask: 'AG' },
+    msg: '【れんしゅう 3/3】重心は 中線を 頂点の ほうから 2 : 1 に 内分する。AG : GD ＝ 2 : 1',
+    wrongOpt: '頂点の ほうが 2。光って いる ボタンを おしてね' },
+];
+function tutDone() { try { return localStorage.getItem(TUT_KEY) === '1'; } catch (e) { return false; } }
+let pulseId = null;
+function pulse(id) {
+  pulseId = id;
+  ['decideBtn'].concat(optBtns.map((b, i) => 'opt' + i)).forEach(b => {
+    const el = b.startsWith('opt') ? optBtns[+b[3]] : $(b);
+    el.classList.toggle('pulse', b === id);
+  });
+  $('btnHint').classList.toggle('hidden', !id);
+  placeBtnHint();
+}
+function placeBtnHint() {
+  if (!pulseId) return;
+  const el = pulseId.startsWith('opt') ? optBtns[+pulseId[3]] : $(pulseId);
+  const b = el.getBoundingClientRect(), g = gameEl.getBoundingClientRect();
+  $('btnHint').style.left = (b.left - g.left + b.width * 0.84) + 'px';
+  $('btnHint').style.top = (b.top - g.top + 26) + 'px';
+}
+function startTutorial() {
+  state.tut = { i: 0, step: 'opt' };
+  state.ch = 1; state.slotIdx = 0; state.hp = 1; state.lives = MAX_LIVES;
+  $('skipTut').classList.remove('hidden');
+  tutProblem();
+}
+function tutProblem() {
+  const t = TUT[state.tut.i];
+  state.problem = C.build(JSON.parse(JSON.stringify(t.prm)), Math.random);
+  state.problem.target = { lv: false };
+  resetInput();
+  state.phase = 'play';
+  renderEnemy(); renderProblem(); renderControls(); renderStatus();
+  setMessage(t.msg);
+  state.tut.step = 'opt'; pulse('opt' + p().options.findIndex(o => o.correct));
+  draw();
+}
+function tutOpt(i) {
+  const q = p();
+  if (state.tut.step !== 'opt') return;
+  if (!q.options[i].correct) { setMessage(TUT[state.tut.i].wrongOpt); return; }
+  state.opt = i; state.tut.step = 'decide';
+  renderControls(); setMessage('さいごに「けってい」を おそう'); pulse('decideBtn'); draw();
+}
+function tutDecide() {
+  if (state.tut.step !== 'decide') return;
+  const last = state.tut.i === TUT.length - 1;
+  pulse(null);
+  state.reveal = true; state.phase = 'next';
+  renderControls(); draw(); flashScreen(); monsterAnim('hit'); showMaru();
+  setMessage('せいかい！　みどりが 答えの 印。\n' + p().reason.join('\n') + '\n' + (last ? 'これで れんしゅうは おしまい' : 'つぎの れんしゅうへ'));
+  state.onNext = last ? () => { state.phase = 'idle'; $('tutDoneScreen').classList.remove('hidden'); } : () => { state.tut.i += 1; tutProblem(); };
+}
+function endTutorial() {
+  pulse(null);
+  state.tut = null;
+  $('skipTut').classList.add('hidden');
+  try { localStorage.setItem(TUT_KEY, '1'); } catch (e) { /* 保存できなくても 遊べる */ }
+  showMap();
+}
+
+// ---------- 操作 ----------
+optBtns.forEach((b, i) => b.addEventListener('click', () => {
+  if (state.phase !== 'play') return;
+  if (state.tut) { tutOpt(i); return; }
+  state.opt = i; renderControls();
+}));
+$('decideBtn').addEventListener('click', submit);
+$('againBtn').addEventListener('click', () => { $('clearScreen').classList.add('hidden'); state.ctx = C.newContext(); startChapter(state.ch); });
+$('ruleBtn').addEventListener('click', () => $('ruleScreen').classList.remove('hidden'));
+$('ruleClose').addEventListener('click', () => $('ruleScreen').classList.add('hidden'));
+$('ruleDef').addEventListener('click', () => { $('ruleScreen').classList.add('hidden'); openDef('▶ もどる'); });
+$('defClose').addEventListener('click', () => $('defScreen').classList.add('hidden'));
+$('nextBtn').addEventListener('click', next);
+$('startBtn').addEventListener('click', () => {
+  $('titleScreen').classList.add('hidden');
+  state.ctx = C.newContext();
+  if (tutDone()) showMap(); else startTutorial();
+});
+$('howBtn').addEventListener('click', () => { $('titleScreen').classList.add('hidden'); startTutorial(); });
+$('skipTut').addEventListener('click', () => { if (state.tut) endTutorial(); });
+$('goBtn').addEventListener('click', () => { $('tutDoneScreen').classList.add('hidden'); endTutorial(); });
+$('retryBtn').addEventListener('click', () => { $('gameOverScreen').classList.add('hidden'); startChapter(state.ch); });
+$('toMapBtn').addEventListener('click', () => { $('gameOverScreen').classList.add('hidden'); gameEl.classList.remove('boss-mid', 'boss-final'); showMap(); });
+$('clearBtn').addEventListener('click', () => { $('clearScreen').classList.add('hidden'); showMap(); });
+$('resetBtn1').addEventListener('click', () => $('resetScreen').classList.remove('hidden'));
+$('resetYes').addEventListener('click', resetAll);
+$('resetNo').addEventListener('click', () => $('resetScreen').classList.add('hidden'));
+$('zukanBtn').addEventListener('click', showZukan);
+$('zukanClose').addEventListener('click', () => { $('zukanScreen').classList.add('hidden'); showMap(); });
+$('mapBtn').addEventListener('click', () => { if (!state.tut && (state.phase === 'play' || state.phase === 'next')) $('quitScreen').classList.remove('hidden'); });
+$('quitNo').addEventListener('click', () => $('quitScreen').classList.add('hidden'));
+$('quitYes').addEventListener('click', () => {
+  $('quitScreen').classList.add('hidden');
+  gameEl.classList.remove('boss-mid', 'boss-final');
+  state.phase = 'idle'; state.onNext = null; renderMapBtn();
+  showMap();
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  e.preventDefault();
+  if (e.repeat) return;
+  if (!$('resetScreen').classList.contains('hidden') || !$('mapScreen').classList.contains('hidden') || !$('quitScreen').classList.contains('hidden')) return;
+  const overlayBtn = { defScreen: 'defClose', ruleScreen: 'ruleClose', zukanScreen: 'zukanClose', titleScreen: 'startBtn', tutDoneScreen: 'goBtn', clearScreen: 'clearBtn', gameOverScreen: 'retryBtn' };
+  for (const id in overlayBtn) if (!$(id).classList.contains('hidden')) { $(overlayBtn[id]).click(); return; }
+  if (state.phase === 'next') next();
+  else if (state.phase === 'play' && e.key === 'Enter') submit();
+});
+
+new ResizeObserver(resizePlane).observe(wrap);
+renderTitleComp(); renderStatus(); renderControls();
+})();
+</script>
+</body>
+</html>
